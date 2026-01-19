@@ -5,7 +5,12 @@ from function_display import (
     display_file_functions,
     display_function_calls,
     select_file_interactive,
-    select_function_interactive
+    select_function_interactive,
+    generate_call_graph,
+    generate_function_focus_graph,
+    generate_project_call_graph,
+    select_project_function_interactive,
+    generate_project_function_focus_graph
 )
 
 
@@ -24,6 +29,10 @@ def display_judgment_list(judgments):
     print("S: 프로젝트 구조 보기 (Structure)")
     print("F: 파일 함수 보기 (File Functions)")
     print("C: 함수 호출 관계 보기 (Call Graph)")
+    print("G: 전체 호출 그래프 생성 (Full Graph)")
+    print("V: 특정 함수 중심 그래프 생성 (Function View)")
+    print("P: 프로젝트 전체 호출 그래프 (Project Graph)")
+    print("X: 프로젝트 전체에서 특정 함수 중심 그래프 (Project Function Focus)")
     print("=" * 70)
 
 
@@ -83,6 +92,8 @@ def main():
     data = load_data()
     judgments = data['judgments']
     project_dir = Path(__file__).parent
+    output_dir = project_dir / 'graphs'
+    output_dir.mkdir(exist_ok=True)
     
     while True:
         display_judgment_list(judgments)
@@ -110,6 +121,36 @@ def main():
                 if selected_func:
                     display_function_calls(selected_func, functions)
                     input("\n계속하려면 Enter를 누르세요...")
+        
+        elif choice.upper() == "G":
+            selected_file = select_file_interactive(project_dir)
+            if selected_file:
+                from function_analyzer import analyze_python_file
+                functions = analyze_python_file(selected_file)
+                generate_call_graph(functions, selected_file.stem, output_dir)
+                input("\n계속하려면 Enter를 누르세요...")
+        
+        elif choice.upper() == "V":
+            selected_file = select_file_interactive(project_dir)
+            if selected_file:
+                from function_analyzer import analyze_python_file
+                functions = display_file_functions(selected_file)
+                selected_func = select_function_interactive(functions)
+                if selected_func:
+                    generate_function_focus_graph(selected_func, functions, selected_file.stem, output_dir)
+                    input("\n계속하려면 Enter를 누르세요...")
+        
+        elif choice.upper() == "P":
+            print("\n프로젝트 전체 호출 관계 분석 중...")
+            generate_project_call_graph(project_dir, output_dir)
+            input("\n계속하려면 Enter를 누르세요...")
+        
+        elif choice.upper() == "X":
+            print("\n프로젝트 전체에서 함수 선택...")
+            selected_func_full, all_functions = select_project_function_interactive(project_dir)
+            if selected_func_full:
+                generate_project_function_focus_graph(selected_func_full, all_functions, output_dir)
+                input("\n계속하려면 Enter를 누르세요...")
         
         elif choice in judgments:
             display_judgment_info(choice, data)
