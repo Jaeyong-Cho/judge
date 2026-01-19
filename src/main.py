@@ -1,6 +1,12 @@
 import json
 from pathlib import Path
-from function_display import display_function_analysis, display_project_function_summary
+from function_display import (
+    display_project_structure,
+    display_file_functions,
+    display_function_calls,
+    select_file_interactive,
+    select_function_interactive
+)
 
 
 def load_data():
@@ -15,8 +21,9 @@ def display_judgment_list(judgments):
     for key, judgment in judgments.items():
         print(f"{key}: {judgment['name']}")
     print("0: 종료")
-    print("A: 현재 파일 함수 분석")
-    print("P: 프로젝트 전체 함수 분석")
+    print("S: 프로젝트 구조 보기 (Structure)")
+    print("F: 파일 함수 보기 (File Functions)")
+    print("C: 함수 호출 관계 보기 (Call Graph)")
     print("=" * 70)
 
 
@@ -75,6 +82,7 @@ def display_judgment_info(judgment_id, data):
 def main():
     data = load_data()
     judgments = data['judgments']
+    project_dir = Path(__file__).parent
     
     while True:
         display_judgment_list(judgments)
@@ -84,14 +92,25 @@ def main():
             print("\n종료합니다!")
             break
         
-        if choice.upper() == "A":
-            current_file = Path(__file__)
-            display_function_analysis(current_file)
+        if choice.upper() == "S":
+            display_project_structure(project_dir)
             input("\n계속하려면 Enter를 누르세요...")
-        elif choice.upper() == "P":
-            project_dir = Path(__file__).parent
-            display_project_function_summary(project_dir)
-            input("\n계속하려면 Enter를 누르세요...")
+        
+        elif choice.upper() == "F":
+            selected_file = select_file_interactive(project_dir)
+            if selected_file:
+                display_file_functions(selected_file)
+                input("\n계속하려면 Enter를 누르세요...")
+        
+        elif choice.upper() == "C":
+            selected_file = select_file_interactive(project_dir)
+            if selected_file:
+                functions = display_file_functions(selected_file)
+                selected_func = select_function_interactive(functions)
+                if selected_func:
+                    display_function_calls(selected_func, functions)
+                    input("\n계속하려면 Enter를 누르세요...")
+        
         elif choice in judgments:
             display_judgment_info(choice, data)
             input("\n계속하려면 Enter를 누르세요...")
