@@ -68,15 +68,53 @@ class ProjectAnalyzer:
         
         if node.type == 'import_from_statement':
             module_node = node.child_by_field_name('module_name')
+            
+            relative_level = 0
+            for child in node.children:
+                if child.type == 'relative_import':
+                    dots_text = child.text.decode('utf8')
+                    relative_level = dots_text.count('.')
+                    break
+            
             if module_node:
                 module_name = module_node.text.decode('utf8')
                 
+                if relative_level > 0:
+                    current_parts = current_module.split('.')
+                    if relative_level <= len(current_parts):
+                        base_parts = current_parts[:-relative_level] if relative_level < len(current_parts) else []
+                        module_name = '.'.join(base_parts + [module_name]) if base_parts else module_name
+                
                 for child in node.children:
                     if child.type == 'dotted_name' or child.type == 'identifier':
-                        if child != module_node:
+                        if child != module_node and child.type != 'relative_import':
                             imported_name = child.text.decode('utf8')
-                            full_name = f"{module_name}.{imported_name}"
-                            self.imports[current_module][imported_name] = full_name
+                            if imported_name not in ['import', 'from']:
+                                full_name = f"{module_name}.{imported_name}"
+                                self.imports[current_module][imported_name] = full_name
+            elif relative_level > 0:
+                current_parts = current_module.split('.')
+                if relative_level <= len(current_parts):
+                    base_parts = current_parts[:-relative_level] if relative_level < len(current_parts) else []
+                    base_module = '.'.join(base_parts) if base_parts else ''
+                    
+                    for child in node.children:
+                        if child.type == 'dotted_name' or child.type == 'identifier':
+                            if child.type != 'relative_import':
+                                imported_name = child.text.decode('utf8')
+                                if imported_name not in ['import', 'from']:
+                                    if base_module:
+                                        full_name = f"{base_module}.{imported_name}"
+                                    else:
+                                        full_name = imported_name
+                                    self.imports[current_module][imported_name] = full_name
+        
+        elif node.type == 'import_statement':
+            for child in node.children:
+                if child.type == 'dotted_name' or child.type == 'identifier':
+                    module_name = child.text.decode('utf8')
+                    if module_name != 'import':
+                        self.imports[current_module][module_name] = module_name
     
     def _extract_functions(self, node, current_module: str):
         if node.type == 'function_definition':
