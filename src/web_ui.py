@@ -26,17 +26,23 @@ def index():
 @app.route('/api/project/structure')
 def get_project_structure():
     try:
+        print(f"Current project directory: {current_project_dir}")
         assert current_project_dir.exists(), f"Project directory does not exist: {current_project_dir}"
         assert current_project_dir.is_dir(), f"Path is not a directory: {current_project_dir}"
         
         print(f"Analyzing project directory: {current_project_dir}")
+        print(f"Absolute path: {current_project_dir.absolute()}")
         functions = analyze_project(current_project_dir)
         print(f"Found {len(functions)} functions")
         
         file_structure = {}
         for full_name, func_info in functions.items():
-            relative_path = Path(func_info.file_path).relative_to(current_project_dir)
-            file_path_str = str(relative_path)
+            try:
+                relative_path = Path(func_info.file_path).relative_to(current_project_dir)
+                file_path_str = str(relative_path)
+            except ValueError:
+                print(f"Warning: Cannot compute relative path for {func_info.file_path}")
+                file_path_str = Path(func_info.file_path).name
             
             if file_path_str not in file_structure:
                 file_structure[file_path_str] = {
@@ -178,7 +184,7 @@ def set_project_directory():
     global current_project_dir
     try:
         data = request.json
-        new_dir = Path(data.get('directory', ''))
+        new_dir = Path(data.get('directory', '')).expanduser().resolve()
         
         print(f"Attempting to set project directory to: {new_dir}")
         
@@ -186,7 +192,7 @@ def set_project_directory():
         assert new_dir.is_dir(), f"Path is not a directory: {new_dir}"
         
         current_project_dir = new_dir
-        print(f"Project directory set to: {current_project_dir}")
+        print(f"Project directory successfully set to: {current_project_dir}")
         
         return jsonify({
             'success': True,

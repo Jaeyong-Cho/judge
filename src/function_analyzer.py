@@ -42,19 +42,29 @@ class ProjectAnalyzer:
         return self.functions
     
     def _get_module_name(self, file_path: Path, project_root: Path) -> str:
-        relative_path = file_path.relative_to(project_root)
-        return str(relative_path.with_suffix('')).replace('/', '.')
+        try:
+            relative_path = file_path.relative_to(project_root)
+            module_name = str(relative_path.with_suffix('')).replace('/', '.').replace('\\', '.')
+            return module_name
+        except ValueError as e:
+            print(f"Warning: Cannot compute relative path for {file_path} from {project_root}: {e}")
+            return file_path.stem
     
     def _analyze_file(self, file_path: Path, project_root: Path):
-        with open(file_path, 'r', encoding='utf-8') as f:
-            source_code = f.read()
-        
-        tree = self.parser.parse(bytes(source_code, 'utf8'))
-        module_name = self._get_module_name(file_path, project_root)
-        
-        self._extract_imports(tree.root_node, module_name)
-        self._extract_functions(tree.root_node, module_name)
-        self._build_call_graph(tree.root_node, module_name)
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                source_code = f.read()
+            
+            tree = self.parser.parse(bytes(source_code, 'utf8'))
+            module_name = self._get_module_name(file_path, project_root)
+            
+            self._extract_imports(tree.root_node, module_name)
+            self._extract_functions(tree.root_node, module_name)
+            self._build_call_graph(tree.root_node, module_name)
+        except Exception as e:
+            print(f"Error analyzing file {file_path}: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _extract_imports(self, node, current_module: str):
         if node.type == 'import_statement' or node.type == 'import_from_statement':
