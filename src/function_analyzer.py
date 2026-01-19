@@ -299,11 +299,11 @@ class ProjectAnalyzer:
     
     def _resolve_cross_file_calls(self):
         for func_full_name, func_info in self.functions.items():
-            parts = func_full_name.split('.')
-            
-            if len(parts) >= 3 and parts[-2] in [f.split('.')[-2] for f in self.functions.keys() if len(f.split('.')) >= 3]:
+            if func_info.class_name:
+                parts = func_full_name.split('.')
                 module_name = '.'.join(parts[:-2])
             else:
+                parts = func_full_name.split('.')
                 module_name = '.'.join(parts[:-1])
             
             resolved_calls = set()
