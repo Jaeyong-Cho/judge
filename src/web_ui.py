@@ -12,9 +12,10 @@ from function_display import (
 app = Flask(__name__)
 
 PROJECT_DIR = Path(__file__).parent.parent
-SRC_DIR = PROJECT_DIR / 'src'
 OUTPUT_DIR = PROJECT_DIR / 'output' / 'graphs'
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+current_project_dir = PROJECT_DIR / 'src'
 
 
 @app.route('/')
@@ -24,30 +25,45 @@ def index():
 
 @app.route('/api/project/structure')
 def get_project_structure():
-    functions = analyze_project(SRC_DIR)
-    
-    file_structure = {}
-    for full_name, func_info in functions.items():
-        file_path = Path(func_info.file_path).name
-        if file_path not in file_structure:
-            file_structure[file_path] = []
+    try:
+        assert current_project_dir.exists(), f"Project directory does not exist: {current_project_dir}"
+        assert current_project_dir.is_dir(), f"Path is not a directory: {current_project_dir}"
         
-        file_structure[file_path].append({
-            'name': func_info.name,
-            'full_name': full_name,
-            'line_start': func_info.line_start,
-            'line_end': func_info.line_end,
-            'callers_count': len(func_info.called_by),
-            'callees_count': len([c for c in func_info.calls if c in functions])
-        })
-    
-    return jsonify(file_structure)
+        print(f"Analyzing project directory: {current_project_dir}")
+        functions = analyze_project(current_project_dir)
+        print(f"Found {len(functions)} functions")
+        
+        file_structure = {}
+        for full_name, func_info in functions.items():
+            file_path = Path(func_info.file_path).name
+            if file_path not in file_structure:
+                file_structure[file_path] = []
+            
+            file_structure[file_path].append({
+                'name': func_info.name,
+                'full_name': full_name,
+                'line_start': func_info.line_start,
+                'line_end': func_info.line_end,
+                'callers_count': len(func_info.called_by),
+                'callees_count': len([c for c in func_info.calls if c in functions])
+            })
+        
+        print(f"Organized into {len(file_structure)} files")
+        return jsonify(file_structure)
+    except Exception as e:
+        print(f"Error in get_project_structure: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'error': str(e),
+            'directory': str(current_project_dir)
+        }), 500
 
 
 @app.route('/api/graph/project')
 def generate_project_graph():
     try:
-        output_path = generate_project_call_graph(SRC_DIR, OUTPUT_DIR)
+        output_path = generate_project_call_graph(current_project_dir, OUTPUT_DIR)
         filename = Path(output_path).name
         return jsonify({
             'success': True,
@@ -63,7 +79,7 @@ def generate_project_graph():
 @app.route('/api/graph/function/<path:func_full_name>')
 def generate_function_graph(func_full_name):
     try:
-        functions = analyze_project(SRC_DIR)
+        functions = analyze_project(current_project_dir)
         
         if func_full_name not in functions:
             return jsonify({
@@ -81,6 +97,10 @@ def generate_function_graph(func_full_name):
         
         func_info = functions[func_full_name]
         
+        with open(func_info.file_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+            source_code = ''.join(lines[func_info.line_start - 1:func_info.line_end])
+        
         return jsonify({
             'success': True,
             'path': f'graphs/{filename}',
@@ -89,7 +109,9 @@ def generate_function_graph(func_full_name):
                 'file': Path(func_info.file_path).name,
                 'lines': f"{func_info.line_start}-{func_info.line_end}",
                 'callers': len(func_info.called_by),
-                'callees': len([c for c in func_info.calls if c in functions])
+                'callees': len([c for c in func_info.calls if c in functions]),
+                'source_code': source_code,
+                'file_path': func_info.file_path
             }
         })
     except Exception as e:
@@ -97,6 +119,41 @@ def generate_function_graph(func_full_name):
             'success': False,
             'error': str(e)
         }), 500
+
+
+@app.route('/api/project/directory', methods=['GET'])
+def get_project_directory():
+    return jsonify({
+        'success': True,
+        'directory': str(current_project_dir)
+    })
+
+
+@app.route('/api/project/directory', methods=['POST'])
+def set_project_directory():
+    global current_project_dir
+    try:
+        data = request.json
+        new_dir = Path(data.get('directory', ''))
+        
+        print(f"Attempting to set project directory to: {new_dir}")
+        
+        assert new_dir.exists(), f"Directory does not exist: {new_dir}"
+        assert new_dir.is_dir(), f"Path is not a directory: {new_dir}"
+        
+        current_project_dir = new_dir
+        print(f"Project directory set to: {current_project_dir}")
+        
+        return jsonify({
+            'success': True,
+            'directory': str(current_project_dir)
+        })
+    except Exception as e:
+        print(f"Error setting project directory: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
 
 
 @app.route('/graphs/<path:filename>')

@@ -222,4 +222,11 @@ def analyze_project(directory: Path) -> Dict[str, FunctionInfo]:
 
 
 def get_all_python_files(directory: Path) -> List[Path]:
-    return list(directory.rglob("*.py"))
+    exclude_dirs = {'.venv', 'venv', '__pycache__', 'node_modules', '.git', 'build', 'dist', '.eggs', '*.egg-info'}
+    
+    python_files = []
+    for py_file in directory.rglob("*.py"):
+        if not any(excluded in py_file.parts for excluded in exclude_dirs):
+            python_files.append(py_file)
+    
+    return python_files
