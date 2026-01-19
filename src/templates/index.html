@@ -361,6 +361,71 @@
             font-weight: 700;
         }
         
+        .highlight-caller {
+            background-color: #d4edda !important;
+            border-bottom: 2px solid #28a745 !important;
+            padding: 0.125rem 0.25rem;
+            border-radius: 3px;
+            font-weight: 600;
+            cursor: help;
+        }
+        
+        .highlight-callee {
+            background-color: #d1ecf1 !important;
+            border-bottom: 2px solid #17a2b8 !important;
+            padding: 0.125rem 0.25rem;
+            border-radius: 3px;
+            font-weight: 600;
+            cursor: help;
+        }
+        
+        .highlight-current {
+            background-color: #fff3cd !important;
+            border-bottom: 2px solid #ffc107 !important;
+            padding: 0.125rem 0.25rem;
+            border-radius: 3px;
+            font-weight: 700;
+            cursor: help;
+        }
+        
+        .function-legend {
+            display: flex;
+            gap: 1rem;
+            padding: 0.75rem 1rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            font-size: 0.813rem;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .legend-box {
+            width: 20px;
+            height: 14px;
+            border-radius: 3px;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+        
+        .legend-caller {
+            background-color: #d4edda;
+            border-bottom: 2px solid #28a745;
+        }
+        
+        .legend-callee {
+            background-color: #d1ecf1;
+            border-bottom: 2px solid #17a2b8;
+        }
+        
+        .legend-current {
+            background-color: #fff3cd;
+            border-bottom: 2px solid #ffc107;
+        }
+        
         .collapsible-section {
             background: white;
             border: 1px solid #d0d0d0;
@@ -858,6 +923,20 @@
                     graphContent.innerHTML = `
                         <div class="content-wrapper">
                             ${assertionsHtml}
+                            <div class="function-legend">
+                                <div class="legend-item">
+                                    <div class="legend-box legend-current"></div>
+                                    <span>Current Function</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-box legend-caller"></div>
+                                    <span>Callers (${data.function.callers} functions)</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-box legend-callee"></div>
+                                    <span>Callees (${data.function.callees} functions)</span>
+                                </div>
+                            </div>
                             <div class="graph-container" id="svgContainer">
                                 ${svgText}
                                 <div class="zoom-controls">
@@ -885,9 +964,14 @@
                         </div>
                     `;
                     
+                    const callerNames = data.function.callers_code ? data.function.callers_code.map(c => c.name) : [];
+                    const calleeNames = data.function.callees_code ? data.function.callees_code.map(c => c.name) : [];
+                    const currentName = data.function.name;
+                    
                     document.getElementById('functionCode').textContent = data.function.source_code;
                     hljs.highlightElement(document.getElementById('functionCode'));
                     highlightAsserts(document.getElementById('functionCode'));
+                    highlightFunctions(document.getElementById('functionCode'), currentName, callerNames, calleeNames);
                     
                     if (data.function.callers_code) {
                         data.function.callers_code.forEach((caller, idx) => {
@@ -896,6 +980,7 @@
                                 elem.textContent = caller.source_code;
                                 hljs.highlightElement(elem);
                                 highlightAsserts(elem);
+                                highlightFunctions(elem, caller.name, callerNames, calleeNames, currentName);
                             }
                         });
                     }
@@ -907,6 +992,7 @@
                                 elem.textContent = callee.source_code;
                                 hljs.highlightElement(elem);
                                 highlightAsserts(elem);
+                                highlightFunctions(elem, callee.name, callerNames, calleeNames, currentName);
                             }
                         });
                     }
@@ -1286,6 +1372,47 @@
                 '$1<span style="background-color: #fff3cd; padding: 0.125rem 0.25rem; border-radius: 3px; color: #e45649; font-weight: 700;">$2</span>$3'
             );
             codeElement.innerHTML = highlightedHtml;
+        }
+        
+        function highlightFunctions(codeElement, currentFunc, callers, callees, mainFunc = null) {
+            let html = codeElement.innerHTML;
+            
+            const allFunctions = new Set();
+            if (currentFunc) allFunctions.add(currentFunc);
+            if (mainFunc) allFunctions.add(mainFunc);
+            callers.forEach(name => allFunctions.add(name));
+            callees.forEach(name => allFunctions.add(name));
+            
+            allFunctions.forEach(funcName => {
+                const escapedName = funcName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(`\\b(${escapedName})\\b(?=\\s*\\()`, 'g');
+                
+                html = html.replace(regex, (match, p1) => {
+                    let className = '';
+                    let title = '';
+                    
+                    if (p1 === currentFunc) {
+                        className = 'highlight-current';
+                        title = `Current function: ${p1}`;
+                    } else if (p1 === mainFunc) {
+                        className = 'highlight-current';
+                        title = `Main function: ${p1}`;
+                    } else if (callers.includes(p1)) {
+                        className = 'highlight-caller';
+                        title = `Caller: ${p1}`;
+                    } else if (callees.includes(p1)) {
+                        className = 'highlight-callee';
+                        title = `Callee: ${p1}`;
+                    }
+                    
+                    if (className) {
+                        return `<span class="${className}" title="${title}">${p1}</span>`;
+                    }
+                    return match;
+                });
+            });
+            
+            codeElement.innerHTML = html;
         }
         
         loadProjectDirectory();
