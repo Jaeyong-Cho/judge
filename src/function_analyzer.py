@@ -189,18 +189,29 @@ class ProjectAnalyzer:
 
 
     def _resolve_function_name(self, func_name: str, current_module: str) -> str:
+        if current_module in self.imports and func_name in self.imports[current_module]:
+            imported_path = self.imports[current_module][func_name]
+            
+            for full_name in self.functions.keys():
+                if full_name == imported_path:
+                    return full_name
+                
+                if full_name.endswith(f".{func_name}"):
+                    module_part = '.'.join(full_name.split('.')[:-1])
+                    
+                    if imported_path.endswith(f".{func_name}"):
+                        imported_module = '.'.join(imported_path.split('.')[:-1])
+                        if module_part == imported_module:
+                            return full_name
+                    elif module_part == imported_path:
+                        return full_name
+        
         for full_name in self.functions.keys():
             if full_name.endswith(f".{func_name}"):
                 module_part = '.'.join(full_name.split('.')[:-1])
                 
                 if module_part == current_module:
                     return full_name
-                
-                if current_module in self.imports:
-                    if func_name in self.imports[current_module]:
-                        imported_full = self.imports[current_module][func_name]
-                        if imported_full == full_name or full_name.endswith(imported_full):
-                            return full_name
         
         return ""
 
