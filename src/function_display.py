@@ -385,7 +385,7 @@ def generate_project_function_focus_graph(func_full_name: str, functions: Dict[s
     print(f"  Cross-file calls from this function: {cross_file_calls}")
     print(f"  Related functions (depth 2): {len(related_funcs)}")
     
-    return f"{output_path}.png"
+    return f"{output_path}.svg"
 
 
 def generate_all_function_focus_graphs(directory: Path, output_dir: Path):

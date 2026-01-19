@@ -27,6 +27,7 @@ def display_judgment_list(judgments):
     for key, judgment in judgments.items():
         print(f"{key}: {judgment['name']}")
     print("0: 종료")
+    print("W: 웹 UI 시작 (Web UI)")
     print("S: 프로젝트 구조 보기 (Structure)")
     print("F: 파일 함수 보기 (File Functions)")
     print("C: 함수 호출 관계 보기 (Call Graph)")
@@ -93,9 +94,9 @@ def display_judgment_info(judgment_id, data):
 def main():
     data = load_data()
     judgments = data['judgments']
-    project_dir = Path(__file__).parent
-    output_dir = project_dir / 'graphs'
-    output_dir.mkdir(exist_ok=True)
+    project_dir = Path(__file__).parent.parent
+    output_dir = project_dir / 'output' / 'graphs'
+    output_dir.mkdir(parents=True, exist_ok=True)
     
     while True:
         display_judgment_list(judgments)
@@ -105,7 +106,14 @@ def main():
             print("\n종료합니다!")
             break
         
-        if choice.upper() == "S":
+        if choice.upper() == "W":
+            print("\n웹 UI를 시작합니다...")
+            print("브라우저에서 http://localhost:5000 을 여세요")
+            from web_ui import start_web_ui
+            start_web_ui()
+            break
+        
+        elif choice.upper() == "S":
             display_project_structure(project_dir)
             input("\n계속하려면 Enter를 누르세요...")
         
