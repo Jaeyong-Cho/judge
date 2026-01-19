@@ -150,6 +150,101 @@
             margin-bottom: 0.25rem;
         }
         
+        .tree-folder {
+            margin-bottom: 0.25rem;
+        }
+        
+        .tree-folder-header {
+            padding: 0.5rem;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            user-select: none;
+        }
+        
+        .tree-folder-header:hover {
+            background: #e5e5e6;
+        }
+        
+        .tree-folder-icon {
+            font-size: 0.75rem;
+            transition: transform 0.2s;
+            color: #9196a1;
+        }
+        
+        .tree-folder-header.expanded .tree-folder-icon {
+            transform: rotate(90deg);
+        }
+        
+        .tree-folder-name {
+            font-weight: 500;
+            color: #50a14f;
+        }
+        
+        .tree-folder-children {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            padding-left: 1rem;
+        }
+        
+        .tree-folder-children.expanded {
+            max-height: 3000px;
+            transition: max-height 0.5s ease-in;
+        }
+        
+        .tree-file {
+            padding: 0.5rem;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            margin-bottom: 0.125rem;
+        }
+        
+        .tree-file:hover {
+            background: #e5e5e6;
+        }
+        
+        .tree-file.expanded {
+            background: #f0f0f0;
+        }
+        
+        .tree-file-icon {
+            font-size: 0.75rem;
+            transition: transform 0.2s;
+            color: #9196a1;
+        }
+        
+        .tree-file.expanded .tree-file-icon {
+            transform: rotate(90deg);
+        }
+        
+        .tree-file-name {
+            font-weight: 500;
+            color: #c18401;
+            flex: 1;
+        }
+        
+        .tree-file-functions {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            padding-left: 1.5rem;
+        }
+        
+        .tree-file-functions.expanded {
+            max-height: 2000px;
+            transition: max-height 0.5s ease-in;
+        }
+        
         .function-item {
             padding: 0.5rem;
             cursor: pointer;
@@ -752,23 +847,109 @@
                 
                 listElement.innerHTML = '';
                 
-                const fileNames = Object.keys(data);
+                const filePaths = Object.keys(data);
                 
-                if (fileNames.length === 0) {
+                if (filePaths.length === 0) {
                     listElement.innerHTML = '<div class="empty-state"><p>No Python files found in directory</p></div>';
                     return;
                 }
                 
-                for (const [fileName, functions] of Object.entries(data)) {
-                    const fileGroup = document.createElement('div');
-                    fileGroup.className = 'file-group';
+                const tree = buildDirectoryTree(data);
+                renderTree(tree, listElement);
+                
+            } catch (error) {
+                console.error('Error loading functions:', error);
+                listElement.innerHTML = 
+                    `<div class="empty-state"><p>Error: ${error.message}</p></div>`;
+            }
+        }
+        
+        function buildDirectoryTree(data) {
+            const tree = {};
+            
+            for (const [filePath, fileData] of Object.entries(data)) {
+                const parts = filePath.split('/');
+                let current = tree;
+                
+                for (let i = 0; i < parts.length; i++) {
+                    const part = parts[i];
+                    
+                    if (i === parts.length - 1) {
+                        current[part] = {
+                            type: 'file',
+                            path: filePath,
+                            data: fileData
+                        };
+                    } else {
+                        if (!current[part]) {
+                            current[part] = {
+                                type: 'folder',
+                                children: {}
+                            };
+                        }
+                        current = current[part].children;
+                    }
+                }
+            }
+            
+            return tree;
+        }
+        
+        function renderTree(tree, container, level = 0) {
+            const entries = Object.entries(tree).sort((a, b) => {
+                const aIsFolder = a[1].type === 'folder';
+                const bIsFolder = b[1].type === 'folder';
+                if (aIsFolder && !bIsFolder) return -1;
+                if (!aIsFolder && bIsFolder) return 1;
+                return a[0].localeCompare(b[0]);
+            });
+            
+            for (const [name, node] of entries) {
+                if (node.type === 'folder') {
+                    const folder = document.createElement('div');
+                    folder.className = 'tree-folder';
+                    
+                    const folderHeader = document.createElement('div');
+                    folderHeader.className = 'tree-folder-header';
+                    folderHeader.innerHTML = `
+                        <span class="tree-folder-icon">▶</span>
+                        <span class="tree-folder-name">${name}</span>
+                    `;
+                    
+                    const folderChildren = document.createElement('div');
+                    folderChildren.className = 'tree-folder-children';
+                    
+                    folderHeader.onclick = () => {
+                        folderHeader.classList.toggle('expanded');
+                        folderChildren.classList.toggle('expanded');
+                    };
+                    
+                    folder.appendChild(folderHeader);
+                    folder.appendChild(folderChildren);
+                    container.appendChild(folder);
+                    
+                    renderTree(node.children, folderChildren, level + 1);
+                    
+                } else if (node.type === 'file') {
+                    const fileContainer = document.createElement('div');
+                    fileContainer.className = 'tree-file-container';
                     
                     const fileHeader = document.createElement('div');
-                    fileHeader.className = 'file-name';
-                    fileHeader.textContent = fileName;
-                    fileGroup.appendChild(fileHeader);
+                    fileHeader.className = 'tree-file';
+                    fileHeader.innerHTML = `
+                        <span class="tree-file-icon">▶</span>
+                        <span class="tree-file-name">${name}</span>
+                    `;
                     
-                    functions.sort((a, b) => a.name.localeCompare(b.name));
+                    const functionsContainer = document.createElement('div');
+                    functionsContainer.className = 'tree-file-functions';
+                    
+                    fileHeader.onclick = () => {
+                        fileHeader.classList.toggle('expanded');
+                        functionsContainer.classList.toggle('expanded');
+                    };
+                    
+                    const functions = node.data.functions.sort((a, b) => a.name.localeCompare(b.name));
                     
                     for (const func of functions) {
                         const item = document.createElement('div');
@@ -803,16 +984,13 @@
                         actions.appendChild(graphBtn);
                         
                         item.appendChild(actions);
-                        
-                        fileGroup.appendChild(item);
+                        functionsContainer.appendChild(item);
                     }
                     
-                    listElement.appendChild(fileGroup);
+                    fileContainer.appendChild(fileHeader);
+                    fileContainer.appendChild(functionsContainer);
+                    container.appendChild(fileContainer);
                 }
-            } catch (error) {
-                console.error('Error loading functions:', error);
-                listElement.innerHTML = 
-                    `<div class="empty-state"><p>Error: ${error.message}</p></div>`;
             }
         }
         

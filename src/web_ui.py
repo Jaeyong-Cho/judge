@@ -35,11 +35,17 @@ def get_project_structure():
         
         file_structure = {}
         for full_name, func_info in functions.items():
-            file_path = Path(func_info.file_path).name
-            if file_path not in file_structure:
-                file_structure[file_path] = []
+            relative_path = Path(func_info.file_path).relative_to(current_project_dir)
+            file_path_str = str(relative_path)
             
-            file_structure[file_path].append({
+            if file_path_str not in file_structure:
+                file_structure[file_path_str] = {
+                    'path': file_path_str,
+                    'name': Path(func_info.file_path).name,
+                    'functions': []
+                }
+            
+            file_structure[file_path_str]['functions'].append({
                 'name': func_info.name,
                 'full_name': full_name,
                 'line_start': func_info.line_start,
