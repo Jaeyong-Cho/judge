@@ -198,11 +198,67 @@
             padding: 1rem;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             border: 1px solid #d0d0d0;
+            position: relative;
+            overflow: hidden;
+            cursor: grab;
+        }
+        
+        .graph-container.grabbing {
+            cursor: grabbing;
         }
         
         .graph-container svg {
             max-width: 100%;
             height: auto;
+            transition: transform 0.1s ease-out;
+        }
+        
+        .zoom-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            z-index: 10;
+        }
+        
+        .zoom-btn {
+            width: 32px;
+            height: 32px;
+            background: #FFFFFF;
+            border: 1px solid #D0D0D0;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #383A42;
+            transition: all 0.2s;
+        }
+        
+        .zoom-btn:hover {
+            background: #F0F0F0;
+            border-color: #4078F2;
+        }
+        
+        .zoom-btn:active {
+            background: #E0E0E0;
+        }
+        
+        .zoom-info {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #D0D0D0;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            color: #383A42;
+            z-index: 10;
         }
         
         .empty-state {
@@ -384,10 +440,18 @@
                     const svgText = await svgResponse.text();
                     
                     graphContent.innerHTML = `
-                        <div class="graph-container">
+                        <div class="graph-container" id="svgContainer">
                             ${svgText}
+                            <div class="zoom-controls">
+                                <button class="zoom-btn" id="zoomIn" title="Zoom In">+</button>
+                                <button class="zoom-btn" id="zoomOut" title="Zoom Out">−</button>
+                                <button class="zoom-btn" id="zoomReset" title="Reset Zoom">⟲</button>
+                            </div>
+                            <div class="zoom-info" id="zoomInfo">100%</div>
                         </div>
                     `;
+                    
+                    initializeSVGPanZoom();
                 } else {
                     graphContent.innerHTML = `
                         <div class="empty-state">
@@ -424,10 +488,18 @@
                     const svgText = await svgResponse.text();
                     
                     graphContent.innerHTML = `
-                        <div class="graph-container">
+                        <div class="graph-container" id="svgContainer">
                             ${svgText}
+                            <div class="zoom-controls">
+                                <button class="zoom-btn" id="zoomIn" title="Zoom In">+</button>
+                                <button class="zoom-btn" id="zoomOut" title="Zoom Out">−</button>
+                                <button class="zoom-btn" id="zoomReset" title="Reset Zoom">⟲</button>
+                            </div>
+                            <div class="zoom-info" id="zoomInfo">100%</div>
                         </div>
                     `;
+                    
+                    initializeSVGPanZoom();
                 } else {
                     graphContent.innerHTML = `
                         <div class="empty-state">
@@ -482,6 +554,133 @@
                     </div>
                 `;
             }
+        }
+        
+        let svgState = {
+            scale: 1,
+            translateX: 0,
+            translateY: 0,
+            isDragging: false,
+            startX: 0,
+            startY: 0
+        };
+        
+        function initializeSVGPanZoom() {
+            const container = document.getElementById('svgContainer');
+            const svg = container.querySelector('svg');
+            const zoomInfo = document.getElementById('zoomInfo');
+            
+            if (!svg) return;
+            
+            svgState = {
+                scale: 1,
+                translateX: 0,
+                translateY: 0,
+                isDragging: false,
+                startX: 0,
+                startY: 0
+            };
+            
+            updateSVGTransform(svg);
+            
+            document.getElementById('zoomIn').addEventListener('click', () => {
+                svgState.scale = Math.min(svgState.scale * 1.2, 10);
+                updateSVGTransform(svg);
+                updateZoomInfo(zoomInfo);
+            });
+            
+            document.getElementById('zoomOut').addEventListener('click', () => {
+                svgState.scale = Math.max(svgState.scale / 1.2, 0.1);
+                updateSVGTransform(svg);
+                updateZoomInfo(zoomInfo);
+            });
+            
+            document.getElementById('zoomReset').addEventListener('click', () => {
+                svgState.scale = 1;
+                svgState.translateX = 0;
+                svgState.translateY = 0;
+                updateSVGTransform(svg);
+                updateZoomInfo(zoomInfo);
+            });
+            
+            container.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                
+                const rect = container.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                const newScale = Math.min(Math.max(svgState.scale * delta, 0.1), 10);
+                
+                const scaleChange = newScale / svgState.scale;
+                svgState.translateX = mouseX - (mouseX - svgState.translateX) * scaleChange;
+                svgState.translateY = mouseY - (mouseY - svgState.translateY) * scaleChange;
+                svgState.scale = newScale;
+                
+                updateSVGTransform(svg);
+                updateZoomInfo(zoomInfo);
+            }, { passive: false });
+            
+            container.addEventListener('mousedown', (e) => {
+                if (e.target.closest('.zoom-controls') || e.target.closest('.zoom-info')) return;
+                
+                svgState.isDragging = true;
+                svgState.startX = e.clientX - svgState.translateX;
+                svgState.startY = e.clientY - svgState.translateY;
+                container.classList.add('grabbing');
+            });
+            
+            container.addEventListener('mousemove', (e) => {
+                if (!svgState.isDragging) return;
+                
+                svgState.translateX = e.clientX - svgState.startX;
+                svgState.translateY = e.clientY - svgState.startY;
+                updateSVGTransform(svg);
+            });
+            
+            container.addEventListener('mouseup', () => {
+                svgState.isDragging = false;
+                container.classList.remove('grabbing');
+            });
+            
+            container.addEventListener('mouseleave', () => {
+                svgState.isDragging = false;
+                container.classList.remove('grabbing');
+            });
+            
+            container.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    const touch = e.touches[0];
+                    svgState.isDragging = true;
+                    svgState.startX = touch.clientX - svgState.translateX;
+                    svgState.startY = touch.clientY - svgState.translateY;
+                }
+            });
+            
+            container.addEventListener('touchmove', (e) => {
+                if (svgState.isDragging && e.touches.length === 1) {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    svgState.translateX = touch.clientX - svgState.startX;
+                    svgState.translateY = touch.clientY - svgState.startY;
+                    updateSVGTransform(svg);
+                }
+            }, { passive: false });
+            
+            container.addEventListener('touchend', () => {
+                svgState.isDragging = false;
+            });
+            
+            updateZoomInfo(zoomInfo);
+        }
+        
+        function updateSVGTransform(svg) {
+            svg.style.transform = `translate(${svgState.translateX}px, ${svgState.translateY}px) scale(${svgState.scale})`;
+        }
+        
+        function updateZoomInfo(element) {
+            element.textContent = `${Math.round(svgState.scale * 100)}%`;
         }
         
         loadFunctions();
