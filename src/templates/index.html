@@ -1145,12 +1145,19 @@
                     
                     const callerNames = data.function.callers_code ? data.function.callers_code.map(c => c.name) : [];
                     const calleeNames = data.function.callees_code ? data.function.callees_code.map(c => c.name) : [];
+                    const callerClasses = data.function.callers_code ? data.function.callers_code
+                        .filter(c => c.class_name)
+                        .map(c => c.class_name) : [];
+                    const calleeClasses = data.function.callees_code ? data.function.callees_code
+                        .filter(c => c.class_name)
+                        .map(c => c.class_name) : [];
                     const currentName = data.function.name;
+                    const currentClass = data.function.class_name;
                     
                     document.getElementById('functionCode').textContent = data.function.source_code;
                     hljs.highlightElement(document.getElementById('functionCode'));
                     highlightAsserts(document.getElementById('functionCode'));
-                    highlightFunctions(document.getElementById('functionCode'), currentName, callerNames, calleeNames);
+                    highlightFunctions(document.getElementById('functionCode'), currentName, callerNames, calleeNames, null, currentClass, callerClasses, calleeClasses);
                     
                     if (data.function.callers_code) {
                         data.function.callers_code.forEach((caller, idx) => {
@@ -1159,7 +1166,7 @@
                                 elem.textContent = caller.source_code;
                                 hljs.highlightElement(elem);
                                 highlightAsserts(elem);
-                                highlightFunctions(elem, caller.name, callerNames, calleeNames, currentName);
+                                highlightFunctions(elem, caller.name, callerNames, calleeNames, currentName, caller.class_name, callerClasses, calleeClasses);
                             }
                         });
                     }
@@ -1171,7 +1178,7 @@
                                 elem.textContent = callee.source_code;
                                 hljs.highlightElement(elem);
                                 highlightAsserts(elem);
-                                highlightFunctions(elem, callee.name, callerNames, calleeNames, currentName);
+                                highlightFunctions(elem, callee.name, callerNames, calleeNames, currentName, callee.class_name, callerClasses, calleeClasses);
                             }
                         });
                     }
@@ -1553,7 +1560,7 @@
             codeElement.innerHTML = highlightedHtml;
         }
         
-        function highlightFunctions(codeElement, currentFunc, callers, callees, mainFunc = null) {
+        function highlightFunctions(codeElement, currentFunc, callers, callees, mainFunc = null, currentClass = null, callerClasses = [], calleeClasses = []) {
             let html = codeElement.innerHTML;
             
             const allFunctions = new Set();
@@ -1586,6 +1593,37 @@
                     
                     if (className) {
                         return `<span class="${className}" title="${title}">${p1}</span>`;
+                    }
+                    return match;
+                });
+            });
+            
+            const allClasses = new Set();
+            if (currentClass) allClasses.add(currentClass);
+            callerClasses.forEach(cls => allClasses.add(cls));
+            calleeClasses.forEach(cls => allClasses.add(cls));
+            
+            allClasses.forEach(className => {
+                const escapedName = className.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(`\\b(${escapedName})\\b(?=\\s*\\()`, 'g');
+                
+                html = html.replace(regex, (match, p1) => {
+                    let cssClass = '';
+                    let title = '';
+                    
+                    if (p1 === currentClass) {
+                        cssClass = 'highlight-current';
+                        title = `Current class: ${p1}() calls __init__`;
+                    } else if (callerClasses.includes(p1)) {
+                        cssClass = 'highlight-caller';
+                        title = `Caller class: ${p1}() calls __init__`;
+                    } else if (calleeClasses.includes(p1)) {
+                        cssClass = 'highlight-callee';
+                        title = `Callee class: ${p1}() calls __init__`;
+                    }
+                    
+                    if (cssClass) {
+                        return `<span class="${cssClass}" title="${title}">${p1}</span>`;
                     }
                     return match;
                 });

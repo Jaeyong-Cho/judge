@@ -195,20 +195,25 @@ class ProjectAnalyzer:
         if node.type == 'call':
             function_node = node.child_by_field_name('function')
             if function_node:
-                called_info = self._extract_function_name(function_node)
+                called_info = self._extract_function_name(function_node, current_module, current_class)
                 if called_info and current_func:
                     if current_func in self.functions:
                         self.functions[current_func].calls.add(called_info)
+                        
+                        init_method = self._resolve_class_instantiation(called_info, current_module)
+                        if init_method and init_method in self.functions:
+                            self.functions[current_func].calls.add(init_method)
         
         for child in node.children:
             self._build_call_graph(child, current_module, current_func, current_class)
     
-    def _extract_function_name(self, node) -> str:
+    def _extract_function_name(self, node, current_module: str = "", current_class: str = "") -> str:
         if node.type == 'identifier':
             return node.text.decode('utf8')
         elif node.type == 'attribute':
             full_path = []
             current = node
+            base_obj = None
             
             while current and current.type == 'attribute':
                 attr_node = current.child_by_field_name('attribute')
@@ -218,14 +223,64 @@ class ProjectAnalyzer:
                 obj_node = current.child_by_field_name('object')
                 if obj_node:
                     if obj_node.type == 'identifier':
-                        full_path.insert(0, obj_node.text.decode('utf8'))
+                        base_obj = obj_node.text.decode('utf8')
+                        full_path.insert(0, base_obj)
+                        break
+                    elif obj_node.type == 'call':
+                        call_func = obj_node.child_by_field_name('function')
+                        if call_func:
+                            if call_func.type == 'identifier':
+                                base_obj = call_func.text.decode('utf8')
+                                full_path.insert(0, base_obj)
+                            elif call_func.type == 'attribute':
+                                call_path = self._extract_function_name(call_func, current_module, current_class)
+                                if call_path:
+                                    full_path.insert(0, call_path)
                         break
                     current = obj_node
                 else:
                     break
             
             if full_path:
+                if base_obj == 'self' and current_class:
+                    method_name = full_path[-1]
+                    return f"{current_module}.{current_class}.{method_name}"
                 return '.'.join(full_path)
+        
+        return ""
+    
+    def _resolve_class_instantiation(self, called_name: str, current_module: str) -> str:
+        parts = called_name.split('.')
+        
+        if len(parts) == 1:
+            class_name = parts[0]
+            if class_name and class_name[0].isupper():
+                for full_name in self.functions.keys():
+                    name_parts = full_name.split('.')
+                    if len(name_parts) >= 3 and name_parts[-2] == class_name and name_parts[-1] == '__init__':
+                        func_module = '.'.join(name_parts[:-2])
+                        if func_module == current_module:
+                            return full_name
+                
+                if current_module in self.imports and class_name in self.imports[current_module]:
+                    full_path, _ = self.imports[current_module][class_name]
+                    init_candidate = f"{full_path}.__init__"
+                    if init_candidate in self.functions:
+                        return init_candidate
+        
+        elif len(parts) == 2:
+            module_or_alias = parts[0]
+            class_name = parts[1]
+            
+            if current_module in self.imports and module_or_alias in self.imports[current_module]:
+                full_path, _ = self.imports[current_module][module_or_alias]
+                init_candidate = f"{full_path}.{class_name}.__init__"
+                if init_candidate in self.functions:
+                    return init_candidate
+            
+            for full_name in self.functions.keys():
+                if full_name.endswith(f".{class_name}.__init__"):
+                    return full_name
         
         return ""
     
@@ -244,17 +299,36 @@ class ProjectAnalyzer:
     
     def _resolve_cross_file_calls(self):
         for func_full_name, func_info in self.functions.items():
-            module_name = '.'.join(func_full_name.split('.')[:-1])
+            parts = func_full_name.split('.')
+            
+            if len(parts) >= 3 and parts[-2] in [f.split('.')[-2] for f in self.functions.keys() if len(f.split('.')) >= 3]:
+                module_name = '.'.join(parts[:-2])
+            else:
+                module_name = '.'.join(parts[:-1])
+            
             resolved_calls = set()
             
             for called_name in func_info.calls:
-                resolved_name = self._resolve_function_name(called_name, module_name)
-                if resolved_name:
-                    resolved_calls.add(resolved_name)
-                    if resolved_name in self.functions:
-                        self.functions[resolved_name].called_by.add(func_full_name)
+                if called_name.startswith(module_name + '.'):
+                    if called_name in self.functions:
+                        resolved_calls.add(called_name)
+                        self.functions[called_name].called_by.add(func_full_name)
+                    else:
+                        resolved_name = self._resolve_function_name(called_name, module_name)
+                        if resolved_name:
+                            resolved_calls.add(resolved_name)
+                            if resolved_name in self.functions:
+                                self.functions[resolved_name].called_by.add(func_full_name)
+                        else:
+                            resolved_calls.add(called_name)
                 else:
-                    resolved_calls.add(called_name)
+                    resolved_name = self._resolve_function_name(called_name, module_name)
+                    if resolved_name:
+                        resolved_calls.add(resolved_name)
+                        if resolved_name in self.functions:
+                            self.functions[resolved_name].called_by.add(func_full_name)
+                    else:
+                        resolved_calls.add(called_name)
             
             func_info.calls = resolved_calls
 
@@ -393,22 +467,29 @@ class FunctionAnalyzer:
         if node.type == 'call':
             function_node = node.child_by_field_name('function')
             if function_node:
-                called_name = self._extract_function_name(function_node)
+                called_name = self._extract_function_name(function_node, current_class, current_func)
                 if called_name and current_func:
                     if current_func in self.functions:
                         self.functions[current_func].calls.add(called_name)
+                        
+                        init_method = self._resolve_class_instantiation(called_name)
+                        if init_method and init_method in self.functions:
+                            self.functions[current_func].calls.add(init_method)
+                            self.functions[init_method].called_by.add(current_func)
+                    
                     if called_name in self.functions:
                         self.functions[called_name].called_by.add(current_func)
         
         for child in node.children:
             self._build_call_graph(child, current_func, current_class)
     
-    def _extract_function_name(self, node) -> str:
+    def _extract_function_name(self, node, current_class: str = "", current_func: str = "") -> str:
         if node.type == 'identifier':
             return node.text.decode('utf8')
         elif node.type == 'attribute':
             full_path = []
             current = node
+            base_obj = None
             
             while current and current.type == 'attribute':
                 attr_node = current.child_by_field_name('attribute')
@@ -418,14 +499,47 @@ class FunctionAnalyzer:
                 obj_node = current.child_by_field_name('object')
                 if obj_node:
                     if obj_node.type == 'identifier':
-                        full_path.insert(0, obj_node.text.decode('utf8'))
+                        base_obj = obj_node.text.decode('utf8')
+                        full_path.insert(0, base_obj)
+                        break
+                    elif obj_node.type == 'call':
+                        call_func = obj_node.child_by_field_name('function')
+                        if call_func:
+                            if call_func.type == 'identifier':
+                                base_obj = call_func.text.decode('utf8')
+                                full_path.insert(0, base_obj)
+                            elif call_func.type == 'attribute':
+                                call_path = self._extract_function_name(call_func, current_class, current_func)
+                                if call_path:
+                                    full_path.insert(0, call_path)
                         break
                     current = obj_node
                 else:
                     break
             
             if full_path:
+                if base_obj == 'self' and current_class:
+                    method_name = full_path[-1]
+                    return f"{current_class}.{method_name}"
                 return '.'.join(full_path)
+        
+        return ""
+    
+    def _resolve_class_instantiation(self, called_name: str) -> str:
+        parts = called_name.split('.')
+        
+        if len(parts) == 1:
+            class_name = parts[0]
+            if class_name and class_name[0].isupper():
+                init_candidate = f"{class_name}.__init__"
+                if init_candidate in self.functions:
+                    return init_candidate
+        
+        elif len(parts) == 2:
+            class_name = parts[1] if parts[1][0].isupper() else parts[0]
+            init_candidate = f"{called_name}.__init__"
+            if init_candidate in self.functions:
+                return init_candidate
         
         return ""
     
