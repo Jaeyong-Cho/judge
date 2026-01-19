@@ -22,11 +22,13 @@ class ProjectAnalyzer:
         self.functions: Dict[str, FunctionInfo] = {}
         self.imports: Dict[str, Dict[str, Tuple[str, str]]] = {}
         self.file_modules: Dict[str, str] = {}
+        self.variable_types: Dict[str, Dict[str, str]] = {}
     
     def analyze_project(self, directory: Path) -> Dict[str, FunctionInfo]:
         self.functions.clear()
         self.imports.clear()
         self.file_modules.clear()
+        self.variable_types.clear()
         
         python_files = get_all_python_files(directory)
         
@@ -76,6 +78,8 @@ class ProjectAnalyzer:
     def _parse_import(self, node, current_module: str):
         if current_module not in self.imports:
             self.imports[current_module] = {}
+        
+        imports_before = len(self.imports[current_module])
         
         if node.type == 'import_from_statement':
             base_module = self._extract_from_module(node, current_module)
@@ -127,6 +131,11 @@ class ProjectAnalyzer:
                     module_name = child.text.decode('utf8')
                     if module_name != 'import':
                         self.imports[current_module][module_name] = (module_name, module_name)
+        
+        imports_after = len(self.imports[current_module])
+        if imports_after > imports_before:
+            new_imports = {k: v for k, v in list(self.imports[current_module].items())[imports_before:]}
+            print(f"[{current_module}] New imports: {new_imports}")
     
     def _extract_from_module(self, node, current_module: str) -> str:
         module_node = node.child_by_field_name('module_name')
@@ -201,11 +210,17 @@ class ProjectAnalyzer:
                     current_func = f"{current_module}.{current_class}.{func_name}"
                 else:
                     current_func = f"{current_module}.{func_name}"
+                
+                if current_func not in self.variable_types:
+                    self.variable_types[current_func] = {}
+        
+        if node.type == 'assignment':
+            self._track_variable_assignment(node, current_func, current_module)
         
         if node.type == 'call':
             function_node = node.child_by_field_name('function')
             if function_node:
-                called_info = self._extract_function_name(function_node, current_module, current_class)
+                called_info = self._extract_function_name(function_node, current_module, current_class, current_func)
                 if called_info and current_func:
                     if current_func in self.functions:
                         self.functions[current_func].calls.add(called_info)
@@ -217,7 +232,36 @@ class ProjectAnalyzer:
         for child in node.children:
             self._build_call_graph(child, current_module, current_func, current_class)
     
-    def _extract_function_name(self, node, current_module: str = "", current_class: str = "") -> str:
+    def _track_variable_assignment(self, node, current_func: str, current_module: str):
+        """Track variable assignments to class instances."""
+        if not current_func or current_func not in self.variable_types:
+            return
+        
+        left_node = node.child_by_field_name('left')
+        right_node = node.child_by_field_name('right')
+        
+        if not left_node or not right_node:
+            return
+        
+        if left_node.type == 'identifier':
+            var_name = left_node.text.decode('utf8')
+            
+            if right_node.type == 'call':
+                func_node = right_node.child_by_field_name('function')
+                if func_node:
+                    class_name = self._extract_function_name(func_node, current_module, "")
+                    if class_name and class_name[0].isupper():
+                        parts = class_name.split('.')
+                        if len(parts) == 1:
+                            for full_name in self.functions.keys():
+                                name_parts = full_name.split('.')
+                                if len(name_parts) >= 2 and name_parts[-2] == class_name:
+                                    self.variable_types[current_func][var_name] = '.'.join(name_parts[:-1])
+                                    break
+                        else:
+                            self.variable_types[current_func][var_name] = '.'.join(parts[:-1]) if parts[-1] == parts[-1].title() else class_name
+    
+    def _extract_function_name(self, node, current_module: str = "", current_class: str = "", current_func: str = "") -> str:
         if node.type == 'identifier':
             return node.text.decode('utf8')
         elif node.type == 'attribute':
@@ -243,7 +287,7 @@ class ProjectAnalyzer:
                                 base_obj = call_func.text.decode('utf8')
                                 full_path.insert(0, base_obj)
                             elif call_func.type == 'attribute':
-                                call_path = self._extract_function_name(call_func, current_module, current_class)
+                                call_path = self._extract_function_name(call_func, current_module, current_class, current_func)
                                 if call_path:
                                     full_path.insert(0, call_path)
                         break
@@ -255,6 +299,11 @@ class ProjectAnalyzer:
                 if base_obj == 'self' and current_class:
                     method_name = full_path[-1]
                     return f"{current_module}.{current_class}.{method_name}"
+                elif base_obj and current_func and current_func in self.variable_types:
+                    if base_obj in self.variable_types[current_func]:
+                        class_path = self.variable_types[current_func][base_obj]
+                        method_name = full_path[-1]
+                        return f"{class_path}.{method_name}"
                 return '.'.join(full_path)
         
         return ""
@@ -308,6 +357,10 @@ class ProjectAnalyzer:
             yield from self._traverse_nodes(child)
     
     def _resolve_cross_file_calls(self):
+        print(f"\n=== Starting cross-file call resolution ===")
+        print(f"Total functions: {len(self.functions)}")
+        print(f"Total imports: {len(self.imports)}")
+        
         for func_full_name, func_info in self.functions.items():
             if func_info.class_name:
                 parts = func_full_name.split('.')
@@ -317,6 +370,7 @@ class ProjectAnalyzer:
                 module_name = '.'.join(parts[:-1])
             
             resolved_calls = set()
+            unresolved_calls = []
             
             for called_name in func_info.calls:
                 if called_name.startswith(module_name + '.'):
@@ -330,6 +384,7 @@ class ProjectAnalyzer:
                             if resolved_name in self.functions:
                                 self.functions[resolved_name].called_by.add(func_full_name)
                         else:
+                            unresolved_calls.append(called_name)
                             resolved_calls.add(called_name)
                 else:
                     resolved_name = self._resolve_function_name(called_name, module_name)
@@ -338,9 +393,15 @@ class ProjectAnalyzer:
                         if resolved_name in self.functions:
                             self.functions[resolved_name].called_by.add(func_full_name)
                     else:
+                        unresolved_calls.append(called_name)
                         resolved_calls.add(called_name)
             
+            if unresolved_calls:
+                print(f"[{func_full_name}] Unresolved calls: {unresolved_calls}")
+            
             func_info.calls = resolved_calls
+        
+        print(f"=== Cross-file call resolution complete ===\n")
 
 
     def _resolve_function_name(self, func_name: str, current_module: str) -> str:

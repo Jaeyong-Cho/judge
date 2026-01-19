@@ -206,6 +206,36 @@ def set_project_directory():
         }), 400
 
 
+@app.route('/api/debug/info')
+def debug_info():
+    """Debug endpoint to check current state."""
+    try:
+        functions = analyze_project(current_project_dir)
+        
+        function_list = []
+        for full_name, func_info in list(functions.items())[:10]:
+            function_list.append({
+                'full_name': full_name,
+                'name': func_info.name,
+                'class_name': func_info.class_name,
+                'file': func_info.file_path,
+                'calls': list(func_info.calls)[:5],
+                'called_by': list(func_info.called_by)[:5]
+            })
+        
+        return jsonify({
+            'current_dir': str(current_project_dir),
+            'total_functions': len(functions),
+            'sample_functions': function_list
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+
 @app.route('/graphs/<path:filename>')
 def serve_graph(filename):
     file_path = OUTPUT_DIR / filename
