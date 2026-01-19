@@ -319,7 +319,6 @@
                         const item = document.createElement('div');
                         item.className = 'function-item';
                         item.dataset.fullName = func.full_name;
-                        item.onclick = () => loadFunctionGraph(func.full_name, func.name);
                         
                         const name = document.createElement('div');
                         name.className = 'function-item-name';
@@ -330,6 +329,24 @@
                         info.className = 'function-item-info';
                         info.textContent = `Lines ${func.line_start}-${func.line_end} · ${func.callers_count} callers · ${func.callees_count} callees`;
                         item.appendChild(info);
+                        
+                        const actions = document.createElement('div');
+                        actions.style.marginTop = '0.25rem';
+                        actions.style.display = 'flex';
+                        actions.style.gap = '0.25rem';
+                        
+                        const graphBtn = document.createElement('button');
+                        graphBtn.className = 'btn btn-primary';
+                        graphBtn.style.padding = '0.25rem 0.5rem';
+                        graphBtn.style.fontSize = '0.75rem';
+                        graphBtn.textContent = 'View Graph';
+                        graphBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            loadFunctionGraph(func.full_name, func.name);
+                        };
+                        actions.appendChild(graphBtn);
+                        
+                        item.appendChild(actions);
                         
                         fileGroup.appendChild(item);
                     }

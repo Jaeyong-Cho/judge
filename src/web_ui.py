@@ -11,8 +11,9 @@ from function_display import (
 
 app = Flask(__name__)
 
-PROJECT_DIR = Path(__file__).parent
-OUTPUT_DIR = PROJECT_DIR.parent / 'output' / 'graphs'
+PROJECT_DIR = Path(__file__).parent.parent
+SRC_DIR = PROJECT_DIR / 'src'
+OUTPUT_DIR = PROJECT_DIR / 'output' / 'graphs'
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -23,7 +24,7 @@ def index():
 
 @app.route('/api/project/structure')
 def get_project_structure():
-    functions = analyze_project(PROJECT_DIR)
+    functions = analyze_project(SRC_DIR)
     
     file_structure = {}
     for full_name, func_info in functions.items():
@@ -46,7 +47,7 @@ def get_project_structure():
 @app.route('/api/graph/project')
 def generate_project_graph():
     try:
-        output_path = generate_project_call_graph(PROJECT_DIR, OUTPUT_DIR)
+        output_path = generate_project_call_graph(SRC_DIR, OUTPUT_DIR)
         filename = Path(output_path).name
         return jsonify({
             'success': True,
@@ -62,7 +63,7 @@ def generate_project_graph():
 @app.route('/api/graph/function/<path:func_full_name>')
 def generate_function_graph(func_full_name):
     try:
-        functions = analyze_project(PROJECT_DIR)
+        functions = analyze_project(SRC_DIR)
         
         if func_full_name not in functions:
             return jsonify({
