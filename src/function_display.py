@@ -133,10 +133,10 @@ def generate_call_graph(functions: Dict[str, FunctionInfo], file_name: str, outp
                 dot.edge(func_name, callee, color=edge_color, penwidth='2' if edge_color == 'red' else '1')
     
     output_path = output_dir / f'{file_name}_call_graph'
-    dot.render(output_path, format='png', cleanup=True)
+    dot.render(output_path, format='svg', cleanup=True)
     
-    print(f"\nGraph generated: {output_path}.png")
-    return f"{output_path}.png"
+    print(f"\nGraph generated: {output_path}.svg")
+    return f"{output_path}.svg"
 
 
 def generate_function_focus_graph(func_name: str, functions: Dict[str, FunctionInfo], file_name: str, output_dir: Path):
@@ -165,9 +165,9 @@ def generate_function_focus_graph(func_name: str, functions: Dict[str, FunctionI
             dot.edge(func_name, callee, style='dashed')
     
     output_path = output_dir / f'{file_name}_{func_name}_focus'
-    dot.render(output_path, format='png', cleanup=True)
+    dot.render(output_path, format='svg', cleanup=True)
     
-    print(f"\nGraph generated: {output_path}.png")
+    print(f"\nGraph generated: {output_path}.svg")
     print("\nLegend:")
     print("  Orange (bold): Target function")
     print("  Green: Callers")
@@ -175,7 +175,7 @@ def generate_function_focus_graph(func_name: str, functions: Dict[str, FunctionI
     print("  Gray (dashed): External functions")
     print("  Red edges: Recursive calls")
     
-    return f"{output_path}.png"
+    return f"{output_path}.svg"
 
 
 def generate_project_call_graph(directory: Path, output_dir: Path):
@@ -226,9 +226,9 @@ def generate_project_call_graph(directory: Path, output_dir: Path):
                         dot.edge(full_name, callee, color='blue')
     
     output_path = output_dir / 'project_call_graph'
-    dot.render(output_path, format='png', cleanup=True)
+    dot.render(output_path, format='svg', cleanup=True)
     
-    print(f"\nProject call graph generated: {output_path}.png")
+    print(f"\nProject call graph generated: {output_path}.svg")
     print("\nLegend:")
     print("  Clusters: Individual files")
     print("  Green: Entry points")
@@ -248,7 +248,7 @@ def generate_project_call_graph(directory: Path, output_dir: Path):
     print(f"  Total functions: {total_functions}")
     print(f"  Cross-file calls: {cross_file_calls}")
     
-    return f"{output_path}.png"
+    return f"{output_path}.svg"
 
 
 def select_project_function_interactive(directory: Path) -> str:
@@ -362,9 +362,9 @@ def generate_project_function_focus_graph(func_full_name: str, functions: Dict[s
                             dot.edge(full_name, callee, color='blue')
     
     output_path = output_dir / f'project_{target_func.name}_focus'
-    dot.render(output_path, format='png', cleanup=True)
+    dot.render(output_path, format='svg', cleanup=True)
     
-    print(f"\nProject function focus graph generated: {output_path}.png")
+    print(f"\nProject function focus graph generated: {output_path}.svg")
     print("\nLegend:")
     print("  Orange (bold): Target function")
     print("  Green: Direct callers")
@@ -386,3 +386,127 @@ def generate_project_function_focus_graph(func_full_name: str, functions: Dict[s
     print(f"  Related functions (depth 2): {len(related_funcs)}")
     
     return f"{output_path}.png"
+
+
+def generate_all_function_focus_graphs(directory: Path, output_dir: Path):
+    print("\nAnalyzing project...")
+    functions = analyze_project(directory)
+    
+    assert len(functions) > 0, "No functions found in project"
+    
+    batch_output_dir = output_dir / 'batch_function_focus'
+    batch_output_dir.mkdir(exist_ok=True)
+    
+    total_functions = len(functions)
+    print(f"\nGenerating focus graphs for {total_functions} functions...")
+    print("=" * 70)
+    
+    generated_count = 0
+    for idx, func_full_name in enumerate(sorted(functions.keys()), 1):
+        func_info = functions[func_full_name]
+        file_name = Path(func_info.file_path).stem
+        
+        print(f"[{idx}/{total_functions}] {func_info.name} ({file_name}.py)")
+        
+        try:
+            target_func = func_info
+            
+            def collect_related(start_func: str, depth: int = 2) -> Set[str]:
+                related = {start_func}
+                
+                def traverse_callers(func_name: str, current_depth: int):
+                    if current_depth >= depth or func_name not in functions:
+                        return
+                    for caller in functions[func_name].called_by:
+                        if caller not in related:
+                            related.add(caller)
+                            traverse_callers(caller, current_depth + 1)
+                
+                def traverse_callees(func_name: str, current_depth: int):
+                    if current_depth >= depth or func_name not in functions:
+                        return
+                    for callee in functions[func_name].calls:
+                        if callee not in related and callee in functions:
+                            related.add(callee)
+                            traverse_callees(callee, current_depth + 1)
+                
+                traverse_callers(start_func, 0)
+                traverse_callees(start_func, 0)
+                
+                return related
+            
+            related_funcs = collect_related(func_full_name)
+            
+            if len(related_funcs) == 1:
+                print(f"  Skipped: No relationships")
+                continue
+            
+            dot = graphviz.Digraph(comment=f'Focus: {target_func.name}')
+            dot.attr(rankdir='TB')
+            dot.attr('graph', splines='ortho', nodesep='0.6', ranksep='0.8')
+            
+            file_clusters: Dict[str, List[str]] = {}
+            for full_name in related_funcs:
+                if full_name in functions:
+                    f_info = functions[full_name]
+                    f_path = f_info.file_path
+                    if f_path not in file_clusters:
+                        file_clusters[f_path] = []
+                    file_clusters[f_path].append(full_name)
+            
+            for cluster_idx, (f_path, func_list) in enumerate(sorted(file_clusters.items())):
+                f_name = Path(f_path).name
+                with dot.subgraph(name=f'cluster_{cluster_idx}') as cluster:
+                    cluster.attr(label=f_name, style='filled', color='lightgrey')
+                    cluster.attr('node', shape='box', style='rounded,filled')
+                    
+                    for full_name in func_list:
+                        f_info = functions[full_name]
+                        display_name = f_info.name
+                        
+                        if full_name == func_full_name:
+                            cluster.node(full_name, display_name, fillcolor='orange', penwidth='3')
+                        elif full_name in target_func.called_by:
+                            cluster.node(full_name, display_name, fillcolor='lightgreen')
+                        elif full_name in target_func.calls:
+                            cluster.node(full_name, display_name, fillcolor='lightblue')
+                        else:
+                            cluster.node(full_name, display_name, fillcolor='lightyellow')
+            
+            for full_name in related_funcs:
+                if full_name in functions:
+                    f_info = functions[full_name]
+                    for callee in f_info.calls:
+                        if callee in related_funcs and callee in functions:
+                            caller_file = f_info.file_path
+                            callee_file = functions[callee].file_path
+                            
+                            if full_name == func_full_name or callee == func_full_name:
+                                if caller_file != callee_file:
+                                    dot.edge(full_name, callee, color='red', penwidth='3')
+                                else:
+                                    dot.edge(full_name, callee, color='darkgreen', penwidth='3')
+                            else:
+                                if caller_file != callee_file:
+                                    dot.edge(full_name, callee, color='red', penwidth='1.5')
+                                else:
+                                    dot.edge(full_name, callee, color='blue')
+            
+            output_filename = f'{file_name}_{target_func.name}_focus'
+            output_path = batch_output_dir / output_filename
+            dot.render(output_path, format='svg', cleanup=True)
+            
+            generated_count += 1
+            print(f"  Generated: {output_filename}.svg")
+            
+        except Exception as e:
+            print(f"  Error: {str(e)}")
+    
+    print("\n" + "=" * 70)
+    print(f"Batch generation complete!")
+    print(f"  Total functions: {total_functions}")
+    print(f"  Graphs generated: {generated_count}")
+    print(f"  Skipped: {total_functions - generated_count}")
+    print(f"  Output directory: {batch_output_dir}")
+    
+    return batch_output_dir

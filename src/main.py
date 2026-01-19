@@ -10,7 +10,8 @@ from function_display import (
     generate_function_focus_graph,
     generate_project_call_graph,
     select_project_function_interactive,
-    generate_project_function_focus_graph
+    generate_project_function_focus_graph,
+    generate_all_function_focus_graphs
 )
 
 
@@ -33,6 +34,7 @@ def display_judgment_list(judgments):
     print("V: 특정 함수 중심 그래프 생성 (Function View)")
     print("P: 프로젝트 전체 호출 그래프 (Project Graph)")
     print("X: 프로젝트 전체에서 특정 함수 중심 그래프 (Project Function Focus)")
+    print("A: 모든 함수의 Focus 그래프 일괄 생성 (All Function Focus)")
     print("=" * 70)
 
 
@@ -150,6 +152,12 @@ def main():
             selected_func_full, all_functions = select_project_function_interactive(project_dir)
             if selected_func_full:
                 generate_project_function_focus_graph(selected_func_full, all_functions, output_dir)
+                input("\n계속하려면 Enter를 누르세요...")
+        
+        elif choice.upper() == "A":
+            confirm = input("\n모든 함수의 Focus 그래프를 생성하시겠습니까? (y/n): ").strip().lower()
+            if confirm == 'y':
+                generate_all_function_focus_graphs(project_dir, output_dir)
                 input("\n계속하려면 Enter를 누르세요...")
         
         elif choice in judgments:
