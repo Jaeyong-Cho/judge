@@ -12,6 +12,7 @@ class FunctionInfo:
         self.file_path = file_path
         self.calls: Set[str] = set()
         self.called_by: Set[str] = set()
+        self.assertions: List[str] = []
 
 
 class ProjectAnalyzer:
@@ -87,6 +88,7 @@ class ProjectAnalyzer:
                 full_name = f"{current_module}.{func_name}"
                 file_path = self.file_modules.get(current_module, "")
                 self.functions[full_name] = FunctionInfo(func_name, start_line, end_line, file_path)
+                self._extract_assertions(node, full_name)
         
         for child in node.children:
             self._extract_functions(child, current_module)
@@ -117,6 +119,19 @@ class ProjectAnalyzer:
             if attr_node:
                 return attr_node.text.decode('utf8')
         return ""
+    
+    def _extract_assertions(self, func_node, func_full_name: str):
+        assert func_full_name in self.functions, f"Function not found: {func_full_name}"
+        
+        for node in self._traverse_nodes(func_node):
+            if node.type == 'assert_statement':
+                assertion_text = node.text.decode('utf8').strip()
+                self.functions[func_full_name].assertions.append(assertion_text)
+    
+    def _traverse_nodes(self, node):
+        yield node
+        for child in node.children:
+            yield from self._traverse_nodes(child)
     
     def _resolve_cross_file_calls(self):
         for func_full_name, func_info in self.functions.items():
@@ -178,6 +193,7 @@ class FunctionAnalyzer:
                 start_line = node.start_point[0] + 1
                 end_line = node.end_point[0] + 1
                 self.functions[func_name] = FunctionInfo(func_name, start_line, end_line, file_path)
+                self._extract_assertions(node, func_name)
         
         for child in node.children:
             self._extract_functions(child, file_path)
@@ -209,6 +225,19 @@ class FunctionAnalyzer:
             if attr_node:
                 return attr_node.text.decode('utf8')
         return ""
+    
+    def _extract_assertions(self, func_node, func_name: str):
+        assert func_name in self.functions, f"Function not found: {func_name}"
+        
+        for node in self._traverse_nodes(func_node):
+            if node.type == 'assert_statement':
+                assertion_text = node.text.decode('utf8').strip()
+                self.functions[func_name].assertions.append(assertion_text)
+    
+    def _traverse_nodes(self, node):
+        yield node
+        for child in node.children:
+            yield from self._traverse_nodes(child)
 
 
 def analyze_python_file(file_path: Path) -> Dict[str, FunctionInfo]:

@@ -347,6 +347,223 @@
             font-weight: 500;
         }
         
+        .hljs-keyword {
+            color: #a626a4;
+            font-weight: 600;
+        }
+        
+        .code-viewer code .hljs-keyword:has-text("assert"),
+        .code-viewer code span:contains("assert") {
+            background-color: #fff3cd;
+            padding: 0.125rem 0.25rem;
+            border-radius: 3px;
+            color: #e45649;
+            font-weight: 700;
+        }
+        
+        .collapsible-section {
+            background: white;
+            border: 1px solid #d0d0d0;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .collapsible-header {
+            background: #f0f0f0;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+            transition: background 0.2s;
+        }
+        
+        .collapsible-header:hover {
+            background: #e5e5e6;
+        }
+        
+        .collapsible-header.active {
+            background: #e5e5e6;
+            border-bottom: 1px solid #d0d0d0;
+        }
+        
+        .collapsible-title {
+            font-size: 0.938rem;
+            font-weight: 600;
+            color: #383a42;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .collapsible-badge {
+            display: inline-block;
+            background: #4078f2;
+            color: white;
+            padding: 0.125rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .collapsible-toggle {
+            font-size: 1.25rem;
+            color: #9196a1;
+            transition: transform 0.2s;
+        }
+        
+        .collapsible-header.active .collapsible-toggle {
+            transform: rotate(90deg);
+        }
+        
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        
+        .collapsible-content.expanded {
+            max-height: 5000px;
+            transition: max-height 0.5s ease-in;
+        }
+        
+        .collapsible-body {
+            padding: 0;
+        }
+        
+        .function-code-item {
+            border-top: 1px solid #e5e5e6;
+        }
+        
+        .function-code-item:first-child {
+            border-top: none;
+        }
+        
+        .function-code-header {
+            background: #fafafa;
+            padding: 0.5rem 1rem;
+            font-size: 0.813rem;
+            color: #383a42;
+            border-bottom: 1px solid #e5e5e6;
+        }
+        
+        .function-code-meta {
+            color: #9196a1;
+            font-size: 0.75rem;
+        }
+        
+        .assertions-section {
+            background: white;
+            border: 1px solid #d0d0d0;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1rem;
+        }
+        
+        .assertions-header {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #383a42;
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #e5e5e6;
+        }
+        
+        .assertion-item {
+            padding: 0.5rem;
+            background: #fafafa;
+            border: 1px solid #e5e5e6;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.813rem;
+            color: #383a42;
+        }
+        
+        .assertion-badge {
+            display: inline-block;
+            background: #50a14f;
+            color: white;
+            padding: 0.125rem 0.375rem;
+            border-radius: 3px;
+            font-size: 0.688rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+        
+        .no-assertions {
+            color: #9196a1;
+            font-style: italic;
+            font-size: 0.813rem;
+        }
+        
+        .assertions-summary {
+            background: #e8f4ff;
+            border: 1px solid #4078f2;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .assertions-summary h3 {
+            font-size: 1rem;
+            color: #383a42;
+            margin-bottom: 0.75rem;
+        }
+        
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.875rem;
+        }
+        
+        .stat-label {
+            color: #383a42;
+            font-weight: 500;
+        }
+        
+        .stat-value {
+            color: #4078f2;
+            font-weight: 600;
+            font-size: 1.125rem;
+        }
+        
+        .function-assertions-list {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        
+        .function-assertion-card {
+            background: white;
+            border: 1px solid #d0d0d0;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .function-assertion-card h4 {
+            font-size: 0.938rem;
+            color: #a626a4;
+            margin-bottom: 0.5rem;
+        }
+        
+        .function-meta {
+            font-size: 0.75rem;
+            color: #9196a1;
+            margin-bottom: 0.75rem;
+        }
+        
         .empty-state {
             text-align: center;
             padding: 4rem 2rem;
@@ -416,7 +633,7 @@
                 <h2>Project Functions</h2>
                 <div class="sidebar-actions">
                     <button class="btn btn-primary" onclick="loadProjectGraph()">Project Graph</button>
-                    <button class="btn btn-primary" onclick="showProjectTree()">Tree</button>
+                    <button class="btn btn-primary" onclick="showAssertions()">Assertions</button>
                 </div>
             </div>
             <div class="function-list" id="functionList">
@@ -443,6 +660,12 @@
     
     <script>
         let currentFunction = null;
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
         
         async function loadFunctions() {
             const listElement = document.getElementById('functionList');
@@ -494,7 +717,8 @@
                         
                         const info = document.createElement('div');
                         info.className = 'function-item-info';
-                        info.textContent = `Lines ${func.line_start}-${func.line_end} · ${func.callers_count} callers · ${func.callees_count} callees`;
+                        const assertionText = func.assertions_count > 0 ? ` · ${func.assertions_count} assertions` : '';
+                        info.textContent = `Lines ${func.line_start}-${func.line_end} · ${func.callers_count} callers · ${func.callees_count} callees${assertionText}`;
                         item.appendChild(info);
                         
                         const actions = document.createElement('div');
@@ -550,8 +774,90 @@
                     const svgResponse = await fetch(`/${data.path}`);
                     const svgText = await svgResponse.text();
                     
+                    let assertionsHtml = '';
+                    if (data.function.assertions && data.function.assertions.length > 0) {
+                        assertionsHtml = `
+                            <div class="assertions-section">
+                                <div class="assertions-header">
+                                    Assertions <span class="assertion-badge">${data.function.assertions.length}</span>
+                                </div>
+                                ${data.function.assertions.map((assertion, idx) => 
+                                    `<div class="assertion-item">${idx + 1}. ${escapeHtml(assertion)}</div>`
+                                ).join('')}
+                            </div>
+                        `;
+                    } else {
+                        assertionsHtml = `
+                            <div class="assertions-section">
+                                <div class="assertions-header">Assertions</div>
+                                <div class="no-assertions">No assertions found in this function</div>
+                            </div>
+                        `;
+                    }
+                    
+                    let callersHtml = '';
+                    if (data.function.callers_code && data.function.callers_code.length > 0) {
+                        callersHtml = `
+                            <div class="collapsible-section">
+                                <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                                    <div class="collapsible-title">
+                                        <span>Callers</span>
+                                        <span class="collapsible-badge">${data.function.callers_code.length}</span>
+                                    </div>
+                                    <span class="collapsible-toggle">▶</span>
+                                </div>
+                                <div class="collapsible-content">
+                                    <div class="collapsible-body">
+                                        ${data.function.callers_code.map((caller, idx) => `
+                                            <div class="function-code-item">
+                                                <div class="function-code-header">
+                                                    <strong>${caller.name}</strong>
+                                                    <span class="function-code-meta"> · ${caller.file} (Lines ${caller.lines})</span>
+                                                </div>
+                                                <div class="code-viewer-body">
+                                                    <pre><code class="language-python caller-code-${idx}"></code></pre>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    let calleesHtml = '';
+                    if (data.function.callees_code && data.function.callees_code.length > 0) {
+                        calleesHtml = `
+                            <div class="collapsible-section">
+                                <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                                    <div class="collapsible-title">
+                                        <span>Callees</span>
+                                        <span class="collapsible-badge">${data.function.callees_code.length}</span>
+                                    </div>
+                                    <span class="collapsible-toggle">▶</span>
+                                </div>
+                                <div class="collapsible-content">
+                                    <div class="collapsible-body">
+                                        ${data.function.callees_code.map((callee, idx) => `
+                                            <div class="function-code-item">
+                                                <div class="function-code-header">
+                                                    <strong>${callee.name}</strong>
+                                                    <span class="function-code-meta"> · ${callee.file} (Lines ${callee.lines})</span>
+                                                </div>
+                                                <div class="code-viewer-body">
+                                                    <pre><code class="language-python callee-code-${idx}"></code></pre>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
                     graphContent.innerHTML = `
                         <div class="content-wrapper">
+                            ${assertionsHtml}
                             <div class="graph-container" id="svgContainer">
                                 ${svgText}
                                 <div class="zoom-controls">
@@ -561,20 +867,49 @@
                                 </div>
                                 <div class="zoom-info" id="zoomInfo">100%</div>
                             </div>
-                            <div class="code-viewer">
-                                <div class="code-viewer-header">
-                                    <span>${data.function.file} (Lines ${data.function.lines})</span>
-                                    <span style="color: #9196a1; font-size: 0.75rem;">${data.function.name}</span>
+                            <div class="collapsible-section">
+                                <div class="collapsible-header active" onclick="toggleCollapsible(this)">
+                                    <div class="collapsible-title">
+                                        <span>Source Code: ${data.function.name}</span>
+                                    </div>
+                                    <span class="collapsible-toggle">▶</span>
                                 </div>
-                                <div class="code-viewer-body">
-                                    <pre><code class="language-python" id="functionCode"></code></pre>
+                                <div class="collapsible-content expanded">
+                                    <div class="code-viewer-body">
+                                        <pre><code class="language-python" id="functionCode"></code></pre>
+                                    </div>
                                 </div>
                             </div>
+                            ${callersHtml}
+                            ${calleesHtml}
                         </div>
                     `;
                     
                     document.getElementById('functionCode').textContent = data.function.source_code;
                     hljs.highlightElement(document.getElementById('functionCode'));
+                    highlightAsserts(document.getElementById('functionCode'));
+                    
+                    if (data.function.callers_code) {
+                        data.function.callers_code.forEach((caller, idx) => {
+                            const elem = document.querySelector(`.caller-code-${idx}`);
+                            if (elem) {
+                                elem.textContent = caller.source_code;
+                                hljs.highlightElement(elem);
+                                highlightAsserts(elem);
+                            }
+                        });
+                    }
+                    
+                    if (data.function.callees_code) {
+                        data.function.callees_code.forEach((callee, idx) => {
+                            const elem = document.querySelector(`.callee-code-${idx}`);
+                            if (elem) {
+                                elem.textContent = callee.source_code;
+                                hljs.highlightElement(elem);
+                                highlightAsserts(elem);
+                            }
+                        });
+                    }
                     
                     initializeSVGPanZoom();
                 } else {
@@ -676,6 +1011,92 @@
                 graphContent.innerHTML = `
                     <div class="empty-state">
                         <p>Error loading project tree</p>
+                    </div>
+                `;
+            }
+        }
+        
+        async function showAssertions() {
+            const graphContent = document.getElementById('graphContent');
+            graphContent.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading assertions...</p></div>';
+            
+            document.getElementById('graphTitle').textContent = 'Project Assertions';
+            
+            document.querySelectorAll('.function-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            try {
+                const response = await fetch('/api/project/assertions');
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error);
+                }
+                
+                let contentHtml = '';
+                
+                if (data.summary.total_assertions === 0) {
+                    contentHtml = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">⚠️</div>
+                            <h3>No Assertions Found</h3>
+                            <p>None of the functions in the project contain assertions</p>
+                        </div>
+                    `;
+                } else {
+                    contentHtml = `
+                        <div class="assertions-summary">
+                            <h3>Assertions Summary</h3>
+                            <div class="summary-stats">
+                                <div class="stat-item">
+                                    <span class="stat-label">Total Functions:</span>
+                                    <span class="stat-value">${data.summary.total_functions}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Functions with Assertions:</span>
+                                    <span class="stat-value">${data.summary.functions_with_assertions}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Total Assertions:</span>
+                                    <span class="stat-value">${data.summary.total_assertions}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Average per Function:</span>
+                                    <span class="stat-value">${data.summary.average.toFixed(2)}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="function-assertions-list">
+                    `;
+                    
+                    for (const func of data.functions) {
+                        contentHtml += `
+                            <div class="function-assertion-card">
+                                <h4>${func.name}</h4>
+                                <div class="function-meta">
+                                    ${func.file} (Lines ${func.lines}) · ${func.assertion_count} assertion${func.assertion_count > 1 ? 's' : ''}
+                                </div>
+                        `;
+                        
+                        func.assertions.forEach((assertion, idx) => {
+                            contentHtml += `<div class="assertion-item">${idx + 1}. ${escapeHtml(assertion)}</div>`;
+                        });
+                        
+                        contentHtml += `</div>`;
+                    }
+                    
+                    contentHtml += `</div>`;
+                }
+                
+                graphContent.innerHTML = contentHtml;
+                
+            } catch (error) {
+                console.error('Error loading assertions:', error);
+                graphContent.innerHTML = `
+                    <div class="empty-state">
+                        <p>Error loading assertions: ${error.message}</p>
                     </div>
                 `;
             }
@@ -850,6 +1271,21 @@
         
         function updateZoomInfo(element) {
             element.textContent = `${Math.round(svgState.scale * 100)}%`;
+        }
+        
+        function toggleCollapsible(header) {
+            header.classList.toggle('active');
+            const content = header.nextElementSibling;
+            content.classList.toggle('expanded');
+        }
+        
+        function highlightAsserts(codeElement) {
+            const html = codeElement.innerHTML;
+            const highlightedHtml = html.replace(
+                /(<span class="hljs-keyword">)(assert)(<\/span>)/gi,
+                '$1<span style="background-color: #fff3cd; padding: 0.125rem 0.25rem; border-radius: 3px; color: #e45649; font-weight: 700;">$2</span>$3'
+            );
+            codeElement.innerHTML = highlightedHtml;
         }
         
         loadProjectDirectory();

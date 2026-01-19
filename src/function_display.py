@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Dict, List, Set
+import shutil
 from function_analyzer import FunctionInfo, analyze_python_file, get_all_python_files, analyze_project
 import graphviz
 
@@ -30,9 +31,64 @@ def display_file_functions(file_path: Path):
     print(f"Functions: {len(functions)}\n")
     
     for idx, (func_name, func_info) in enumerate(sorted(functions.items()), 1):
-        print(f"  {idx}. {func_name} (Lines {func_info.line_start}-{func_info.line_end})")
+        assertion_count = len(func_info.assertions)
+        assertion_info = f" [{assertion_count} assertions]" if assertion_count > 0 else ""
+        print(f"  {idx}. {func_name} (Lines {func_info.line_start}-{func_info.line_end}){assertion_info}")
     
     return functions
+
+
+def display_all_assertions(functions: Dict[str, FunctionInfo]):
+    assert len(functions) > 0, "No functions provided"
+    
+    print("\nAssertions by Function")
+    print("=" * 70)
+    
+    total_assertions = 0
+    functions_with_assertions = 0
+    
+    for func_name in sorted(functions.keys()):
+        func_info = functions[func_name]
+        if func_info.assertions:
+            functions_with_assertions += 1
+            print(f"\n{func_name} (Lines {func_info.line_start}-{func_info.line_end}):")
+            print("-" * 70)
+            for idx, assertion in enumerate(func_info.assertions, 1):
+                print(f"  {idx}. {assertion}")
+                total_assertions += 1
+    
+    if total_assertions == 0:
+        print("  No assertions found in any function")
+    else:
+        print("\n" + "=" * 70)
+        print(f"Summary:")
+        print(f"  Total functions: {len(functions)}")
+        print(f"  Functions with assertions: {functions_with_assertions}")
+        print(f"  Total assertions: {total_assertions}")
+        print(f"  Average assertions per function: {total_assertions / len(functions):.2f}")
+
+
+def display_function_assertions(func_name: str, functions: Dict[str, FunctionInfo]):
+    assert func_name in functions, f"Function not found: {func_name}"
+    
+    func_info = functions[func_name]
+    
+    print(f"\nFunction: {func_name}")
+    print("=" * 70)
+    print(f"File: {Path(func_info.file_path).name}")
+    print(f"Location: Lines {func_info.line_start}-{func_info.line_end}\n")
+    
+    print("Assertions:")
+    print("-" * 70)
+    
+    if func_info.assertions:
+        for idx, assertion in enumerate(func_info.assertions, 1):
+            print(f"  {idx}. {assertion}")
+        print(f"\nTotal: {len(func_info.assertions)} assertion(s)")
+    else:
+        print("  No assertions found in this function")
+        print("\n⚠️  Warning: This function does not contain any assertions")
+        print("  Consider adding assertions to validate preconditions, postconditions, or invariants.")
 
 
 def display_function_calls(func_name: str, functions: Dict[str, FunctionInfo]):
@@ -44,7 +100,15 @@ def display_function_calls(func_name: str, functions: Dict[str, FunctionInfo]):
     print("=" * 70)
     print(f"Location: Lines {func_info.line_start}-{func_info.line_end}\n")
     
-    print("Calls:")
+    print("Assertions:")
+    print("-" * 70)
+    if func_info.assertions:
+        for idx, assertion in enumerate(func_info.assertions, 1):
+            print(f"  {idx}. {assertion}")
+    else:
+        print("  None")
+    
+    print("\nCalls:")
     print("-" * 70)
     if func_info.calls:
         for callee in sorted(func_info.calls):
@@ -510,3 +574,31 @@ def generate_all_function_focus_graphs(directory: Path, output_dir: Path):
     print(f"  Output directory: {batch_output_dir}")
     
     return batch_output_dir
+
+def clear_workspace_data(output_dir: Path):
+    assert output_dir.exists(), f"Output directory not found: {output_dir}"
+    
+    graphs_dir = output_dir / 'graphs'
+    
+    if graphs_dir.exists():
+        file_count = len(list(graphs_dir.glob('*')))
+        
+        if file_count > 0:
+            print(f"\nClearing workspace data...")
+            print(f"  Found {file_count} files in {graphs_dir}")
+            
+            try:
+                shutil.rmtree(graphs_dir)
+                graphs_dir.mkdir(parents=True, exist_ok=True)
+                print(f"  Successfully cleared all data")
+                return True
+            except Exception as e:
+                print(f"  Error clearing data: {e}")
+                return False
+        else:
+            print(f"\nWorkspace data already clean")
+            return True
+    else:
+        graphs_dir.mkdir(parents=True, exist_ok=True)
+        print(f"\nCreated graphs directory: {graphs_dir}")
+        return True

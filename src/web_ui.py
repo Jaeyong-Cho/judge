@@ -45,7 +45,8 @@ def get_project_structure():
                 'line_start': func_info.line_start,
                 'line_end': func_info.line_end,
                 'callers_count': len(func_info.called_by),
-                'callees_count': len([c for c in func_info.calls if c in functions])
+                'callees_count': len([c for c in func_info.calls if c in functions]),
+                'assertions_count': len(func_info.assertions)
             })
         
         print(f"Organized into {len(file_structure)} files")
@@ -101,6 +102,36 @@ def generate_function_graph(func_full_name):
             lines = f.readlines()
             source_code = ''.join(lines[func_info.line_start - 1:func_info.line_end])
         
+        callers_data = []
+        for caller_full_name in sorted(func_info.called_by):
+            if caller_full_name in functions:
+                caller = functions[caller_full_name]
+                with open(caller.file_path, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
+                    caller_code = ''.join(lines[caller.line_start - 1:caller.line_end])
+                callers_data.append({
+                    'name': caller.name,
+                    'full_name': caller_full_name,
+                    'file': Path(caller.file_path).name,
+                    'lines': f"{caller.line_start}-{caller.line_end}",
+                    'source_code': caller_code
+                })
+        
+        callees_data = []
+        for callee_full_name in sorted(func_info.calls):
+            if callee_full_name in functions:
+                callee = functions[callee_full_name]
+                with open(callee.file_path, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
+                    callee_code = ''.join(lines[callee.line_start - 1:callee.line_end])
+                callees_data.append({
+                    'name': callee.name,
+                    'full_name': callee_full_name,
+                    'file': Path(callee.file_path).name,
+                    'lines': f"{callee.line_start}-{callee.line_end}",
+                    'source_code': callee_code
+                })
+        
         return jsonify({
             'success': True,
             'path': f'graphs/{filename}',
@@ -110,8 +141,11 @@ def generate_function_graph(func_full_name):
                 'lines': f"{func_info.line_start}-{func_info.line_end}",
                 'callers': len(func_info.called_by),
                 'callees': len([c for c in func_info.calls if c in functions]),
+                'assertions': func_info.assertions,
                 'source_code': source_code,
-                'file_path': func_info.file_path
+                'file_path': func_info.file_path,
+                'callers_code': callers_data,
+                'callees_code': callees_data
             }
         })
     except Exception as e:
@@ -162,6 +196,46 @@ def serve_graph(filename):
     if file_path.exists():
         return send_file(file_path, mimetype='image/svg+xml')
     return "File not found", 404
+
+
+@app.route('/api/project/assertions')
+def get_all_assertions():
+    try:
+        functions = analyze_project(current_project_dir)
+        
+        assertions_data = []
+        total_assertions = 0
+        functions_with_assertions = 0
+        
+        for full_name, func_info in sorted(functions.items()):
+            if func_info.assertions:
+                functions_with_assertions += 1
+                total_assertions += len(func_info.assertions)
+                
+                assertions_data.append({
+                    'full_name': full_name,
+                    'name': func_info.name,
+                    'file': Path(func_info.file_path).name,
+                    'lines': f"{func_info.line_start}-{func_info.line_end}",
+                    'assertions': func_info.assertions,
+                    'assertion_count': len(func_info.assertions)
+                })
+        
+        return jsonify({
+            'success': True,
+            'functions': assertions_data,
+            'summary': {
+                'total_functions': len(functions),
+                'functions_with_assertions': functions_with_assertions,
+                'total_assertions': total_assertions,
+                'average': total_assertions / len(functions) if len(functions) > 0 else 0
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 @app.route('/api/project/tree')

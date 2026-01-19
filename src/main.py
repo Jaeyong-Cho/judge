@@ -4,6 +4,8 @@ from function_display import (
     display_project_structure,
     display_file_functions,
     display_function_calls,
+    display_function_assertions,
+    display_all_assertions,
     select_file_interactive,
     select_function_interactive,
     generate_call_graph,
@@ -11,7 +13,8 @@ from function_display import (
     generate_project_call_graph,
     select_project_function_interactive,
     generate_project_function_focus_graph,
-    generate_all_function_focus_graphs
+    generate_all_function_focus_graphs,
+    clear_workspace_data
 )
 
 
@@ -36,6 +39,9 @@ def display_judgment_list(judgments):
     print("P: 프로젝트 전체 호출 그래프 (Project Graph)")
     print("X: 프로젝트 전체에서 특정 함수 중심 그래프 (Project Function Focus)")
     print("A: 모든 함수의 Focus 그래프 일괄 생성 (All Function Focus)")
+    print("T: 파일의 모든 Assertion 보기 (asserTions)")
+    print("E: 특정 함수의 Assertion 보기 (assErtion)")
+    print("D: 데이터 초기화 (Delete Data)")
     print("=" * 70)
 
 
@@ -97,6 +103,8 @@ def main():
     project_dir = Path(__file__).parent.parent
     output_dir = project_dir / 'output' / 'graphs'
     output_dir.mkdir(parents=True, exist_ok=True)
+    
+    clear_workspace_data(output_dir.parent)
     
     while True:
         display_judgment_list(judgments)
@@ -166,6 +174,30 @@ def main():
             confirm = input("\n모든 함수의 Focus 그래프를 생성하시겠습니까? (y/n): ").strip().lower()
             if confirm == 'y':
                 generate_all_function_focus_graphs(project_dir, output_dir)
+                input("\n계속하려면 Enter를 누르세요...")
+        
+        elif choice.upper() == "T":
+            selected_file = select_file_interactive(project_dir)
+            if selected_file:
+                from function_analyzer import analyze_python_file
+                functions = analyze_python_file(selected_file)
+                display_all_assertions(functions)
+                input("\n계속하려면 Enter를 누르세요...")
+        
+        elif choice.upper() == "E":
+            selected_file = select_file_interactive(project_dir)
+            if selected_file:
+                from function_analyzer import analyze_python_file
+                functions = display_file_functions(selected_file)
+                selected_func = select_function_interactive(functions)
+                if selected_func:
+                    display_function_assertions(selected_func, functions)
+                    input("\n계속하려면 Enter를 누르세요...")
+        
+        elif choice.upper() == "D":
+            confirm = input("\n모든 생성된 데이터를 삭제하시겠습니까? (y/n): ").strip().lower()
+            if confirm == 'y':
+                clear_workspace_data(output_dir.parent)
                 input("\n계속하려면 Enter를 누르세요...")
         
         elif choice in judgments:
