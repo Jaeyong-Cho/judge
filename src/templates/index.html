@@ -958,7 +958,8 @@
                         
                         const name = document.createElement('div');
                         name.className = 'function-item-name';
-                        name.textContent = func.name;
+                        const displayName = func.class_name ? `${func.class_name}.${func.name}` : func.name;
+                        name.textContent = displayName;
                         item.appendChild(name);
                         
                         const info = document.createElement('div');
@@ -1054,7 +1055,7 @@
                                         ${data.function.callers_code.map((caller, idx) => `
                                             <div class="function-code-item">
                                                 <div class="function-code-header">
-                                                    <strong>${caller.name}</strong>
+                                                    <strong>${caller.class_name ? caller.class_name + '.' : ''}${caller.name}</strong>
                                                     <span class="function-code-meta"> · ${caller.file} (Lines ${caller.lines})</span>
                                                 </div>
                                                 <div class="code-viewer-body">
@@ -1084,7 +1085,7 @@
                                         ${data.function.callees_code.map((callee, idx) => `
                                             <div class="function-code-item">
                                                 <div class="function-code-header">
-                                                    <strong>${callee.name}</strong>
+                                                    <strong>${callee.class_name ? callee.class_name + '.' : ''}${callee.name}</strong>
                                                     <span class="function-code-meta"> · ${callee.file} (Lines ${callee.lines})</span>
                                                 </div>
                                                 <div class="code-viewer-body">
@@ -1127,7 +1128,7 @@
                             <div class="collapsible-section">
                                 <div class="collapsible-header active" onclick="toggleCollapsible(this)">
                                     <div class="collapsible-title">
-                                        <span>Source Code: ${data.function.name}</span>
+                                        <span>Source Code: ${data.function.class_name ? data.function.class_name + '.' : ''}${data.function.name}</span>
                                     </div>
                                     <span class="collapsible-toggle">▶</span>
                                 </div>

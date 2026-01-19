@@ -5,11 +5,12 @@ from tree_sitter import Language, Parser
 
 
 class FunctionInfo:
-    def __init__(self, name: str, line_start: int, line_end: int, file_path: str = ""):
+    def __init__(self, name: str, line_start: int, line_end: int, file_path: str = "", class_name: str = ""):
         self.name = name
         self.line_start = line_start
         self.line_end = line_end
         self.file_path = file_path
+        self.class_name = class_name
         self.calls: Set[str] = set()
         self.called_by: Set[str] = set()
         self.assertions: List[str] = []
@@ -19,7 +20,7 @@ class ProjectAnalyzer:
     def __init__(self):
         self.parser = Parser(Language(tspython.language()))
         self.functions: Dict[str, FunctionInfo] = {}
-        self.imports: Dict[str, Dict[str, str]] = {}
+        self.imports: Dict[str, Dict[str, Tuple[str, str]]] = {}
         self.file_modules: Dict[str, str] = {}
     
     def analyze_project(self, directory: Path) -> Dict[str, FunctionInfo]:
@@ -67,95 +68,165 @@ class ProjectAnalyzer:
             self.imports[current_module] = {}
         
         if node.type == 'import_from_statement':
-            module_node = node.child_by_field_name('module_name')
+            base_module = self._extract_from_module(node, current_module)
             
-            relative_level = 0
             for child in node.children:
-                if child.type == 'relative_import':
-                    dots_text = child.text.decode('utf8')
-                    relative_level = dots_text.count('.')
-                    break
-            
-            if module_node:
-                module_name = module_node.text.decode('utf8')
-                
-                if relative_level > 0:
-                    current_parts = current_module.split('.')
-                    if relative_level <= len(current_parts):
-                        base_parts = current_parts[:-relative_level] if relative_level < len(current_parts) else []
-                        module_name = '.'.join(base_parts + [module_name]) if base_parts else module_name
-                
-                for child in node.children:
-                    if child.type == 'dotted_name' or child.type == 'identifier':
-                        if child != module_node and child.type != 'relative_import':
-                            imported_name = child.text.decode('utf8')
-                            if imported_name not in ['import', 'from']:
-                                full_name = f"{module_name}.{imported_name}"
-                                self.imports[current_module][imported_name] = full_name
-            elif relative_level > 0:
-                current_parts = current_module.split('.')
-                if relative_level <= len(current_parts):
-                    base_parts = current_parts[:-relative_level] if relative_level < len(current_parts) else []
-                    base_module = '.'.join(base_parts) if base_parts else ''
+                if child.type == 'aliased_import':
+                    name_node = child.child_by_field_name('name')
+                    alias_node = child.child_by_field_name('alias')
                     
-                    for child in node.children:
-                        if child.type == 'dotted_name' or child.type == 'identifier':
-                            if child.type != 'relative_import':
-                                imported_name = child.text.decode('utf8')
-                                if imported_name not in ['import', 'from']:
-                                    if base_module:
-                                        full_name = f"{base_module}.{imported_name}"
-                                    else:
-                                        full_name = imported_name
-                                    self.imports[current_module][imported_name] = full_name
+                    if name_node:
+                        imported_name = name_node.text.decode('utf8')
+                        alias = alias_node.text.decode('utf8') if alias_node else imported_name
+                        
+                        if base_module:
+                            full_path = f"{base_module}.{imported_name}"
+                        else:
+                            full_path = imported_name
+                        
+                        self.imports[current_module][alias] = (full_path, imported_name)
+                
+                elif child.type == 'dotted_name' or (child.type == 'identifier' and child.text.decode('utf8') not in ['from', 'import']):
+                    if not any(c.type in ['module_name', 'relative_import'] for c in node.children if c == child.parent):
+                        imported_name = child.text.decode('utf8')
+                        
+                        if imported_name not in ['from', 'import', 'as']:
+                            if base_module:
+                                full_path = f"{base_module}.{imported_name}"
+                            else:
+                                full_path = imported_name
+                            
+                            self.imports[current_module][imported_name] = (full_path, imported_name)
+                
+                elif child.type == 'wildcard_import':
+                    if base_module:
+                        self.imports[current_module]['*'] = (base_module, '*')
         
         elif node.type == 'import_statement':
             for child in node.children:
-                if child.type == 'dotted_name' or child.type == 'identifier':
+                if child.type == 'aliased_import':
+                    name_node = child.child_by_field_name('name')
+                    alias_node = child.child_by_field_name('alias')
+                    
+                    if name_node:
+                        module_name = name_node.text.decode('utf8')
+                        alias = alias_node.text.decode('utf8') if alias_node else module_name
+                        self.imports[current_module][alias] = (module_name, module_name)
+                
+                elif child.type == 'dotted_name' or child.type == 'identifier':
                     module_name = child.text.decode('utf8')
                     if module_name != 'import':
-                        self.imports[current_module][module_name] = module_name
+                        self.imports[current_module][module_name] = (module_name, module_name)
     
-    def _extract_functions(self, node, current_module: str):
+    def _extract_from_module(self, node, current_module: str) -> str:
+        module_node = node.child_by_field_name('module_name')
+        
+        relative_level = 0
+        for child in node.children:
+            if child.type == 'relative_import':
+                dots_text = child.text.decode('utf8')
+                relative_level = dots_text.count('.')
+                break
+        
+        if module_node:
+            module_name = module_node.text.decode('utf8')
+            
+            if relative_level > 0:
+                current_parts = current_module.split('.')
+                if relative_level <= len(current_parts):
+                    base_parts = current_parts[:-relative_level] if relative_level < len(current_parts) else []
+                    return '.'.join(base_parts + [module_name]) if base_parts else module_name
+            
+            return module_name
+        elif relative_level > 0:
+            current_parts = current_module.split('.')
+            if relative_level <= len(current_parts):
+                base_parts = current_parts[:-relative_level] if relative_level < len(current_parts) else []
+                return '.'.join(base_parts) if base_parts else ''
+        
+        return ''
+    
+    def _extract_functions(self, node, current_module: str, current_class: str = ""):
+        if node.type == 'class_definition':
+            class_name_node = node.child_by_field_name('name')
+            if class_name_node:
+                class_name = class_name_node.text.decode('utf8')
+                for child in node.children:
+                    self._extract_functions(child, current_module, class_name)
+                return
+        
         if node.type == 'function_definition':
             name_node = node.child_by_field_name('name')
             if name_node:
                 func_name = name_node.text.decode('utf8')
                 start_line = node.start_point[0] + 1
                 end_line = node.end_point[0] + 1
-                full_name = f"{current_module}.{func_name}"
+                
+                if current_class:
+                    full_name = f"{current_module}.{current_class}.{func_name}"
+                else:
+                    full_name = f"{current_module}.{func_name}"
+                
                 file_path = self.file_modules.get(current_module, "")
-                self.functions[full_name] = FunctionInfo(func_name, start_line, end_line, file_path)
+                self.functions[full_name] = FunctionInfo(func_name, start_line, end_line, file_path, current_class)
                 self._extract_assertions(node, full_name)
         
         for child in node.children:
-            self._extract_functions(child, current_module)
+            self._extract_functions(child, current_module, current_class)
     
-    def _build_call_graph(self, node, current_module: str, current_func: str = ""):
+    def _build_call_graph(self, node, current_module: str, current_func: str = "", current_class: str = ""):
+        if node.type == 'class_definition':
+            class_name_node = node.child_by_field_name('name')
+            if class_name_node:
+                class_name = class_name_node.text.decode('utf8')
+                for child in node.children:
+                    self._build_call_graph(child, current_module, current_func, class_name)
+                return
+        
         if node.type == 'function_definition':
             name_node = node.child_by_field_name('name')
             if name_node:
                 func_name = name_node.text.decode('utf8')
-                current_func = f"{current_module}.{func_name}"
+                if current_class:
+                    current_func = f"{current_module}.{current_class}.{func_name}"
+                else:
+                    current_func = f"{current_module}.{func_name}"
         
         if node.type == 'call':
             function_node = node.child_by_field_name('function')
             if function_node:
-                called_name = self._extract_function_name(function_node)
-                if called_name and current_func:
+                called_info = self._extract_function_name(function_node)
+                if called_info and current_func:
                     if current_func in self.functions:
-                        self.functions[current_func].calls.add(called_name)
+                        self.functions[current_func].calls.add(called_info)
         
         for child in node.children:
-            self._build_call_graph(child, current_module, current_func)
+            self._build_call_graph(child, current_module, current_func, current_class)
     
     def _extract_function_name(self, node) -> str:
         if node.type == 'identifier':
             return node.text.decode('utf8')
         elif node.type == 'attribute':
-            attr_node = node.child_by_field_name('attribute')
-            if attr_node:
-                return attr_node.text.decode('utf8')
+            full_path = []
+            current = node
+            
+            while current and current.type == 'attribute':
+                attr_node = current.child_by_field_name('attribute')
+                if attr_node:
+                    full_path.insert(0, attr_node.text.decode('utf8'))
+                
+                obj_node = current.child_by_field_name('object')
+                if obj_node:
+                    if obj_node.type == 'identifier':
+                        full_path.insert(0, obj_node.text.decode('utf8'))
+                        break
+                    current = obj_node
+                else:
+                    break
+            
+            if full_path:
+                return '.'.join(full_path)
+        
         return ""
     
     def _extract_assertions(self, func_node, func_full_name: str):
@@ -189,29 +260,69 @@ class ProjectAnalyzer:
 
 
     def _resolve_function_name(self, func_name: str, current_module: str) -> str:
-        if current_module in self.imports and func_name in self.imports[current_module]:
-            imported_path = self.imports[current_module][func_name]
+        parts = func_name.split('.')
+        
+        if len(parts) > 1:
+            first_part = parts[0]
+            
+            if current_module in self.imports and first_part in self.imports[current_module]:
+                full_path, original_name = self.imports[current_module][first_part]
+                
+                if len(parts) == 2:
+                    method_name = parts[1]
+                    
+                    candidate = f"{full_path}.{method_name}"
+                    if candidate in self.functions:
+                        return candidate
+                    
+                    for full_name in self.functions.keys():
+                        if full_name.endswith(f".{method_name}"):
+                            name_parts = full_name.split('.')
+                            func_module = '.'.join(name_parts[:-1])
+                            
+                            if func_module == full_path or func_module.startswith(f"{full_path}."):
+                                return full_name
+                
+                elif len(parts) == 3:
+                    class_or_module = parts[1]
+                    method_name = parts[2]
+                    
+                    candidate = f"{full_path}.{class_or_module}.{method_name}"
+                    if candidate in self.functions:
+                        return candidate
             
             for full_name in self.functions.keys():
-                if full_name == imported_path:
-                    return full_name
-                
-                if full_name.endswith(f".{func_name}"):
-                    module_part = '.'.join(full_name.split('.')[:-1])
-                    
-                    if imported_path.endswith(f".{func_name}"):
-                        imported_module = '.'.join(imported_path.split('.')[:-1])
-                        if module_part == imported_module:
+                name_parts = full_name.split('.')
+                if len(name_parts) >= len(parts):
+                    if all(name_parts[-(len(parts)-i)] == parts[i] for i in range(len(parts))):
+                        func_module = '.'.join(name_parts[:-(len(parts)-1)])
+                        if func_module == current_module:
                             return full_name
-                    elif module_part == imported_path:
-                        return full_name
-        
-        for full_name in self.functions.keys():
-            if full_name.endswith(f".{func_name}"):
-                module_part = '.'.join(full_name.split('.')[:-1])
+        else:
+            if current_module in self.imports and func_name in self.imports[current_module]:
+                full_path, original_name = self.imports[current_module][func_name]
                 
-                if module_part == current_module:
-                    return full_name
+                if full_path in self.functions:
+                    return full_path
+                
+                for full_name in self.functions.keys():
+                    if full_name == full_path:
+                        return full_name
+                    
+                    if full_name.endswith(f".{original_name}"):
+                        name_parts = full_name.split('.')
+                        func_module = '.'.join(name_parts[:-1])
+                        
+                        if func_module == '.'.join(full_path.split('.')[:-1]):
+                            return full_name
+            
+            for full_name in self.functions.keys():
+                if full_name.endswith(f".{func_name}"):
+                    name_parts = full_name.split('.')
+                    func_module = '.'.join(name_parts[:-1])
+                    
+                    if func_module == current_module:
+                        return full_name
         
         return ""
 
@@ -234,24 +345,50 @@ class FunctionAnalyzer:
         
         return self.functions
     
-    def _extract_functions(self, node, file_path: str):
+    def _extract_functions(self, node, file_path: str, current_class: str = ""):
+        if node.type == 'class_definition':
+            class_name_node = node.child_by_field_name('name')
+            if class_name_node:
+                class_name = class_name_node.text.decode('utf8')
+                for child in node.children:
+                    self._extract_functions(child, file_path, class_name)
+                return
+        
         if node.type == 'function_definition':
             name_node = node.child_by_field_name('name')
             if name_node:
                 func_name = name_node.text.decode('utf8')
                 start_line = node.start_point[0] + 1
                 end_line = node.end_point[0] + 1
-                self.functions[func_name] = FunctionInfo(func_name, start_line, end_line, file_path)
-                self._extract_assertions(node, func_name)
+                
+                if current_class:
+                    full_name = f"{current_class}.{func_name}"
+                else:
+                    full_name = func_name
+                
+                self.functions[full_name] = FunctionInfo(func_name, start_line, end_line, file_path, current_class)
+                self._extract_assertions(node, full_name)
         
         for child in node.children:
-            self._extract_functions(child, file_path)
+            self._extract_functions(child, file_path, current_class)
     
-    def _build_call_graph(self, node, current_func: str = ""):
+    def _build_call_graph(self, node, current_func: str = "", current_class: str = ""):
+        if node.type == 'class_definition':
+            class_name_node = node.child_by_field_name('name')
+            if class_name_node:
+                class_name = class_name_node.text.decode('utf8')
+                for child in node.children:
+                    self._build_call_graph(child, current_func, class_name)
+                return
+        
         if node.type == 'function_definition':
             name_node = node.child_by_field_name('name')
             if name_node:
-                current_func = name_node.text.decode('utf8')
+                func_name = name_node.text.decode('utf8')
+                if current_class:
+                    current_func = f"{current_class}.{func_name}"
+                else:
+                    current_func = func_name
         
         if node.type == 'call':
             function_node = node.child_by_field_name('function')
@@ -264,15 +401,32 @@ class FunctionAnalyzer:
                         self.functions[called_name].called_by.add(current_func)
         
         for child in node.children:
-            self._build_call_graph(child, current_func)
+            self._build_call_graph(child, current_func, current_class)
     
     def _extract_function_name(self, node) -> str:
         if node.type == 'identifier':
             return node.text.decode('utf8')
         elif node.type == 'attribute':
-            attr_node = node.child_by_field_name('attribute')
-            if attr_node:
-                return attr_node.text.decode('utf8')
+            full_path = []
+            current = node
+            
+            while current and current.type == 'attribute':
+                attr_node = current.child_by_field_name('attribute')
+                if attr_node:
+                    full_path.insert(0, attr_node.text.decode('utf8'))
+                
+                obj_node = current.child_by_field_name('object')
+                if obj_node:
+                    if obj_node.type == 'identifier':
+                        full_path.insert(0, obj_node.text.decode('utf8'))
+                        break
+                    current = obj_node
+                else:
+                    break
+            
+            if full_path:
+                return '.'.join(full_path)
+        
         return ""
     
     def _extract_assertions(self, func_node, func_name: str):

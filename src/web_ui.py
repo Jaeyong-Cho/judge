@@ -52,7 +52,8 @@ def get_project_structure():
                 'line_end': func_info.line_end,
                 'callers_count': len(func_info.called_by),
                 'callees_count': len([c for c in func_info.calls if c in functions]),
-                'assertions_count': len(func_info.assertions)
+                'assertions_count': len(func_info.assertions),
+                'class_name': func_info.class_name
             })
         
         print(f"Organized into {len(file_structure)} files")
@@ -120,7 +121,8 @@ def generate_function_graph(func_full_name):
                     'full_name': caller_full_name,
                     'file': Path(caller.file_path).name,
                     'lines': f"{caller.line_start}-{caller.line_end}",
-                    'source_code': caller_code
+                    'source_code': caller_code,
+                    'class_name': caller.class_name
                 })
         
         callees_data = []
@@ -135,7 +137,8 @@ def generate_function_graph(func_full_name):
                     'full_name': callee_full_name,
                     'file': Path(callee.file_path).name,
                     'lines': f"{callee.line_start}-{callee.line_end}",
-                    'source_code': callee_code
+                    'source_code': callee_code,
+                    'class_name': callee.class_name
                 })
         
         return jsonify({
@@ -149,7 +152,8 @@ def generate_function_graph(func_full_name):
                 'callees': len([c for c in func_info.calls if c in functions]),
                 'assertions': func_info.assertions,
                 'source_code': source_code,
-                'file_path': func_info.file_path,
+                'flass_name': func_info.class_name,
+                'cile_path': func_info.file_path,
                 'callers_code': callers_data,
                 'callees_code': callees_data
             }
