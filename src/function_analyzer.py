@@ -23,12 +23,14 @@ class ProjectAnalyzer:
         self.imports: Dict[str, Dict[str, Tuple[str, str]]] = {}
         self.file_modules: Dict[str, str] = {}
         self.variable_types: Dict[str, Dict[str, str]] = {}
+        self.class_attributes: Dict[str, Dict[str, str]] = {}
     
     def analyze_project(self, directory: Path) -> Dict[str, FunctionInfo]:
         self.functions.clear()
         self.imports.clear()
         self.file_modules.clear()
         self.variable_types.clear()
+        self.class_attributes.clear()
         
         python_files = get_all_python_files(directory)
         
@@ -215,7 +217,7 @@ class ProjectAnalyzer:
                     self.variable_types[current_func] = {}
         
         if node.type == 'assignment':
-            self._track_variable_assignment(node, current_func, current_module)
+            self._track_variable_assignment(node, current_func, current_module, current_class)
         
         if node.type == 'call':
             function_node = node.child_by_field_name('function')
@@ -232,7 +234,7 @@ class ProjectAnalyzer:
         for child in node.children:
             self._build_call_graph(child, current_module, current_func, current_class)
     
-    def _track_variable_assignment(self, node, current_func: str, current_module: str):
+    def _track_variable_assignment(self, node, current_func: str, current_module: str, current_class: str = ""):
         """Track variable assignments to class instances."""
         if not current_func or current_func not in self.variable_types:
             return
@@ -243,23 +245,43 @@ class ProjectAnalyzer:
         if not left_node or not right_node:
             return
         
+        var_name = None
+        is_self_attribute = False
+        
         if left_node.type == 'identifier':
             var_name = left_node.text.decode('utf8')
-            
-            if right_node.type == 'call':
-                func_node = right_node.child_by_field_name('function')
-                if func_node:
-                    class_name = self._extract_function_name(func_node, current_module, "")
-                    if class_name and class_name[0].isupper():
-                        parts = class_name.split('.')
-                        if len(parts) == 1:
-                            for full_name in self.functions.keys():
-                                name_parts = full_name.split('.')
-                                if len(name_parts) >= 2 and name_parts[-2] == class_name:
-                                    self.variable_types[current_func][var_name] = '.'.join(name_parts[:-1])
-                                    break
+        elif left_node.type == 'attribute':
+            obj_node = left_node.child_by_field_name('object')
+            attr_node = left_node.child_by_field_name('attribute')
+            if obj_node and obj_node.type == 'identifier' and obj_node.text.decode('utf8') == 'self' and attr_node:
+                var_name = attr_node.text.decode('utf8')
+                is_self_attribute = True
+        
+        if var_name and right_node.type == 'call':
+            func_node = right_node.child_by_field_name('function')
+            if func_node:
+                class_name = self._extract_function_name(func_node, current_module, "")
+                if class_name and len(class_name) > 0 and class_name[0].isupper():
+                    parts = class_name.split('.')
+                    class_path = None
+                    
+                    if len(parts) == 1:
+                        for full_name in self.functions.keys():
+                            name_parts = full_name.split('.')
+                            if len(name_parts) >= 2 and name_parts[-2] == class_name:
+                                class_path = '.'.join(name_parts[:-1])
+                                break
+                    else:
+                        class_path = '.'.join(parts[:-1]) if parts[-1] == parts[-1].title() else class_name
+                    
+                    if class_path:
+                        if is_self_attribute and current_class:
+                            class_full_name = f"{current_module}.{current_class}"
+                            if class_full_name not in self.class_attributes:
+                                self.class_attributes[class_full_name] = {}
+                            self.class_attributes[class_full_name][var_name] = class_path
                         else:
-                            self.variable_types[current_func][var_name] = '.'.join(parts[:-1]) if parts[-1] == parts[-1].title() else class_name
+                            self.variable_types[current_func][var_name] = class_path
     
     def _extract_function_name(self, node, current_module: str = "", current_class: str = "", current_func: str = "") -> str:
         if node.type == 'identifier':
@@ -297,8 +319,26 @@ class ProjectAnalyzer:
             
             if full_path:
                 if base_obj == 'self' and current_class:
-                    method_name = full_path[-1]
-                    return f"{current_module}.{current_class}.{method_name}"
+                    if len(full_path) == 2:
+                        method_name = full_path[-1]
+                        return f"{current_module}.{current_class}.{method_name}"
+                    elif len(full_path) >= 3:
+                        attribute_name = full_path[1]
+                        class_full_name = f"{current_module}.{current_class}"
+                        
+                        if class_full_name in self.class_attributes and attribute_name in self.class_attributes[class_full_name]:
+                            class_path = self.class_attributes[class_full_name][attribute_name]
+                            method_name = full_path[-1]
+                            return f"{class_path}.{method_name}"
+                        
+                        if current_func and current_func in self.variable_types:
+                            if attribute_name in self.variable_types[current_func]:
+                                class_path = self.variable_types[current_func][attribute_name]
+                                method_name = full_path[-1]
+                                return f"{class_path}.{method_name}"
+                        
+                        method_name = full_path[-1]
+                        return f"{current_module}.{current_class}.{method_name}"
                 elif base_obj and current_func and current_func in self.variable_types:
                     if base_obj in self.variable_types[current_func]:
                         class_path = self.variable_types[current_func][base_obj]
