@@ -227,9 +227,13 @@ class ProjectAnalyzer:
                     if current_func in self.functions:
                         self.functions[current_func].calls.add(called_info)
                         
+                        if called_info in self.functions:
+                            self.functions[called_info].called_by.add(current_func)
+                        
                         init_method = self._resolve_class_instantiation(called_info, current_module)
                         if init_method and init_method in self.functions:
                             self.functions[current_func].calls.add(init_method)
+                            self.functions[init_method].called_by.add(current_func)
         
         for child in node.children:
             self._build_call_graph(child, current_module, current_func, current_class)
@@ -266,11 +270,22 @@ class ProjectAnalyzer:
                     class_path = None
                     
                     if len(parts) == 1:
+                        current_module_match = None
+                        other_match = None
+                        
                         for full_name in self.functions.keys():
                             name_parts = full_name.split('.')
                             if len(name_parts) >= 2 and name_parts[-2] == class_name:
-                                class_path = '.'.join(name_parts[:-1])
-                                break
+                                candidate_module = '.'.join(name_parts[:-2])
+                                candidate_class = '.'.join(name_parts[:-1])
+                                
+                                if candidate_module == current_module:
+                                    current_module_match = candidate_class
+                                    break
+                                elif not other_match:
+                                    other_match = candidate_class
+                        
+                        class_path = current_module_match or other_match
                     else:
                         class_path = '.'.join(parts[:-1]) if parts[-1] == parts[-1].title() else class_name
                     
